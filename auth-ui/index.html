@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tele Patient Handling System - Auth</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Background Elements -->
+    <div class="background">
+        <div class="blob shape1"></div>
+        <div class="blob shape2"></div>
+    </div>
+
+    <div class="container">
+        <!-- Floating Welcome Banner -->
+        <div class="welcome-box">
+            <h1>Tele Patient</h1>
+            <p>Your health, securely managed.</p>
+        </div>
+
+        <!-- Auth Forms Container -->
+        <div class="auth-wrapper glass-panel">
+            
+            <!-- Custom Toggle -->
+            <div class="toggle-container">
+                <div class="toggle-btn active" id="btn-login" onclick="switchForm('login')">Login</div>
+                <div class="toggle-btn" id="btn-register" onclick="switchForm('register')">Register</div>
+                <div class="toggle-indicator" id="toggle-indicator"></div>
+            </div>
+
+            <!-- Login Form -->
+            <form id="login-form" class="auth-form active-form">
+                <h2>Welcome Back</h2>
+                <p class="subtitle">Enter your credentials to access your account.</p>
+
+                <div class="input-group">
+                    <label for="login-email">Email Address</label>
+                    <input type="email" id="login-email" required placeholder="name@example.com">
+                </div>
+
+                <div class="input-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" required placeholder="••••••••">
+                </div>
+
+                <div class="error-msg" id="login-error"></div>
+                
+                <button type="submit" class="submit-btn" id="login-submit">Sign In <div class="spinner loader"></div></button>
+            </form>
+
+            <!-- Register Form -->
+            <form id="register-form" class="auth-form hidden-form">
+                <h2>Create Account</h2>
+                <p class="subtitle">Join our platform today.</p>
+
+                <div class="input-group">
+                    <label for="reg-name">Full Name</label>
+                    <input type="text" id="reg-name" required placeholder="John Doe">
+                </div>
+
+                <div class="input-group">
+                    <label for="reg-email">Email Address</label>
+                    <input type="email" id="reg-email" required placeholder="name@example.com">
+                </div>
+
+                <div class="input-group">
+                    <label for="reg-password">Password</label>
+                    <input type="password" id="reg-password" required placeholder="Minimum 6 characters">
+                </div>
+
+                <div class="input-group">
+                    <label for="reg-role">Account Type</label>
+                    <select id="reg-role" required>
+                        <option value="PATIENT">Patient</option>
+                        <option value="DOCTOR">Doctor</option>
+                        <option value="ADMIN">Administrator</option>
+                    </select>
+                </div>
+
+                <div class="error-msg" id="reg-error"></div>
+
+                <button type="submit" class="submit-btn" id="reg-submit">Register <div class="spinner loader"></div></button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Quick Dashboard/Test Actions -->
+    <div class="quick-actions" style="text-align:center; margin: 16px;">
+        <button onclick="getDashboardAnalytics()" class="submit-btn">Get Dashboard Analytics</button>
+    </div>
+
+    <!-- Success Modal -->
+    <div id="success-modal" class="modal">
+        <div class="modal-content glass-panel">
+            <div class="success-icon">✓</div>
+            <h2 id="modal-title">Success!</h2>
+            <p id="modal-msg">Operation completed successfully.</p>
+            <button onclick="closeModal()" class="submit-btn outline">Continue</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

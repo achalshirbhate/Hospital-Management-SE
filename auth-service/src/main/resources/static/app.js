@@ -1,0 +1,968 @@
+const API_BASE = '/api';
+let currentUser = null;
+let activeChatTokenId = null;
+let chatPollInterval = null;
+
+// ========================
+// AUTH TOGGLE
+// ========================
+function switchForm(formType) {
+    const loginBtn = document.getElementById('btn-login');
+    const regBtn = document.getElementById('btn-register');
+    const indicator = document.getElementById('toggle-indicator');
+    const loginForm = document.getElementById('login-form');
+    const regForm = document.getElementById('register-form');
+    document.getElementById('login-error').innerText = '';
+    document.getElementById('reg-error').innerText = '';
+    document.getElementById('forgot-form').className = 'auth-form hidden-form';
+    document.getElementById('force-reset-form').className = 'auth-form hidden-form';
+    if (formType === 'register') {
+        loginBtn.classList.remove('active'); regBtn.classList.add('active');
+        indicator.style.transform = 'translateX(100%)';
+        loginForm.className = 'auth-form hidden-form shift-left';
+        setTimeout(() => { regForm.className = 'auth-form active-form'; }, 100);
+    } else {
+        regBtn.classList.remove('active'); loginBtn.classList.add('active');
+        indicator.style.transform = 'translateX(0)';
+        regForm.className = 'auth-form hidden-form';
+        setTimeout(() => { loginForm.className = 'auth-form active-form'; }, 100);
+    }
+}
+
+// ========================
+// FORGOT / TEMP PASSWORD
+// ========================
+function showForgotForm() {
+    document.getElementById('login-form').className = 'auth-form hidden-form shift-left';
+    document.getElementById('forgot-form').className = 'auth-form active-form';
+}
+
+function cancelForgot() {
+    document.getElementById('forgot-form').className = 'auth-form hidden-form';
+    document.getElementById('login-form').className = 'auth-form active-form';
+    document.getElementById('otp-group').classList.add('hidden');
+    document.getElementById('forgot-submit').innerText = 'Send OTP via Email';
+    document.getElementById('forgot-email').readOnly = false;
+}
+
+document.getElementById('forgot-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('forgot-submit');
+    const email = document.getElementById('forgot-email').value;
+    const otpGroup = document.getElementById('otp-group');
+    if (otpGroup.classList.contains('hidden')) {
+        try {
+            await fetch(`${API_BASE}/auth/forgot-password?email=${encodeURIComponent(email)}`, { method: 'POST' });
+            alert("OTP generated. Check the Spring Boot Console for the Mock OTP.");
+            otpGroup.classList.remove('hidden');
+            document.getElementById('forgot-email').readOnly = true;
+            btn.innerText = 'Confirm New Password';
+        } catch(err) { alert('Failed to trigger process'); }
+    } else {
+        const otp = document.getElementById('forgot-otp').value;
+        const newPwd = document.getElementById('forgot-new-pwd').value;
+        try {
+            const res = await fetch(`${API_BASE}/auth/reset-password-otp?email=${encodeURIComponent(email)}&otp=${otp}&newPassword=${newPwd}`, { method: 'POST' });
+            if (!res.ok) throw new Error('Invalid/Expired OTP');
+            alert('Password updated! Please login.');
+            cancelForgot();
+        } catch(err) { alert(err.message); }
+    }
+});
+
+let forceResetUserData = null;
+document.getElementById('force-reset-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const newPwd = document.getElementById('force-new-pwd').value;
+    const email = document.getElementById('force-email').value;
+    try {
+        const res = await fetch(`${API_BASE}/auth/reset-password-temp?email=${encodeURIComponent(email)}&currentPassword=temp@123&newPassword=${newPwd}`, { method: 'POST' });
+        if (!res.ok) throw new Error('Reset rejected.');
+        alert('Account Secured! Transitioning...');
+        document.getElementById('force-reset-form').className = 'auth-form hidden-form';
+        initApp(forceResetUserData);
+    } catch(err) { alert('Failed: ' + err.message); }
+});
+
+// ========================
+// LOGIN & REGISTER
+// ========================
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('login-submit');
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    btn.classList.add('loading'); btn.disabled = true;
+    try {
+        const res = await fetch(`${API_BASE}/auth/login`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.email || data.password || 'Login failed');
+        if (data.requirePasswordReset) {
+            forceResetUserData = data;
+            document.getElementById('login-form').className = 'auth-form hidden-form shift-left';
+            document.getElementById('force-reset-form').className = 'auth-form active-form';
+            document.getElementById('force-email').value = email;
+        } else {
+            initApp(data);
+        }
+    } catch (err) {
+        document.getElementById('login-error').innerText = err.message;
+    } finally {
+        btn.classList.remove('loading'); btn.disabled = false;
+    }
+});
+
+document.getElementById('register-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('reg-submit');
+    const fullName = document.getElementById('reg-name').value;
+    const email = document.getElementById('reg-email').value;
+    const password = document.getElementById('reg-password').value;
+    btn.classList.add('loading'); btn.disabled = true;
+    try {
+        const res = await fetch(`${API_BASE}/auth/register`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ fullName, email, password })
+        });
+        if (!res.ok) throw new Error('Registration failed');
+        alert('Registered! Role defaults to PATIENT. Please login.');
+        switchForm('login');
+    } catch (err) {
+        document.getElementById('reg-error').innerText = err.message;
+    } finally {
+        btn.classList.remove('loading'); btn.disabled = false;
+    }
+});
+
+// ========================
+// INIT APP
+// ========================
+function initApp(userData) {
+    currentUser = userData;
+    document.getElementById('auth-container').classList.add('hidden');
+    document.getElementById('app-container').classList.remove('hidden');
+    document.getElementById('user-badge').innerText = `${userData.fullName} (${userData.role})`;
+    document.getElementById('md-dashboard').classList.add('hidden');
+    document.getElementById('doctor-dashboard').classList.add('hidden');
+    document.getElementById('patient-dashboard').classList.add('hidden');
+    if (userData.role === 'MAIN_DOCTOR') {
+        document.getElementById('md-dashboard').classList.remove('hidden');
+        loadMDDashboard();
+        loadMDQueues();
+    } else if (userData.role === 'DOCTOR') {
+        document.getElementById('doctor-dashboard').classList.remove('hidden');
+        loadDoctorDashboard();
+    } else {
+        document.getElementById('patient-dashboard').classList.remove('hidden');
+        loadPatientDashboard();
+    }
+    loadSocialFeed();
+}
+
+function logout() {
+    currentUser = null;
+    document.getElementById('auth-container').classList.remove('hidden');
+    document.getElementById('app-container').classList.add('hidden');
+    document.getElementById('login-form').className = 'auth-form active-form';
+}
+
+// ========================
+// CHAT
+// ========================
+function renderTimeStatusButton(tk) {
+    const isVideo = tk.type === 'VIDEO';
+    const displayStr = tk.scheduledTime
+        ? new Date(tk.scheduledTime).toLocaleString([], {dateStyle:'short', timeStyle:'short'})
+        : '';
+    const joinFn = isVideo ? `openVideoCall(${tk.id}, '${displayStr}')` : `openChat(${tk.id}, '${displayStr}')`;
+    const joinLabel = isVideo ? '📹 Join Video Call' : '💬 Join Chat';
+    return `<button class="submit-btn" style="width:160px;padding:10px;" onclick="${joinFn}">${joinLabel}</button>`;
+}
+
+function openChat(tokenId, scheduleTime) {
+    activeChatTokenId = tokenId;
+    openModal('chat-modal');
+    document.getElementById('chat-schedule').innerText = scheduleTime ? `Session Authorized (${scheduleTime})` : 'Active Session';
+    document.getElementById('chat-schedule').style.color = 'var(--accent-1)';
+    document.getElementById('chat-messages').innerHTML = '<p class="text-muted" style="text-align:center;">Connecting...</p>';
+    document.getElementById('chat-input').disabled = false;
+    document.getElementById('chat-input').placeholder = 'Type secure message...';
+    document.querySelector("button[onclick='sendChatMessage()']").classList.remove('hidden');
+    const termBtn = document.getElementById('chat-terminate-btn');
+    if (currentUser.role === 'MAIN_DOCTOR') termBtn.classList.remove('hidden');
+    else termBtn.classList.add('hidden');
+    pollChatMessages();
+    chatPollInterval = setInterval(pollChatMessages, 3000);
+}
+
+function closeChat() {
+    clearInterval(chatPollInterval);
+    activeChatTokenId = null;
+    closeModal('chat-modal');
+    if (currentUser) {
+        if (currentUser.role === 'MAIN_DOCTOR') loadMDQueues();
+        else if (currentUser.role === 'PATIENT') loadPatientDashboard();
+    }
+}
+
+// ========================
+// VIDEO CALL
+// ========================
+let localStream = null;
+let peerConnection = null;
+let activeVideoTokenId = null;
+
+function openVideoCall(tokenId, scheduleTime) {
+    activeVideoTokenId = tokenId;
+    document.getElementById('video-schedule').innerText = scheduleTime ? `Session: ${scheduleTime}` : 'Active Session';
+    document.getElementById('video-terminate-btn').classList.toggle('hidden', currentUser.role !== 'MAIN_DOCTOR');
+    openModal('video-modal');
+    startLocalCamera();
+}
+
+async function startLocalCamera() {
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        document.getElementById('local-video').srcObject = localStream;
+    } catch(e) {
+        alert('Camera/Microphone access denied or unavailable: ' + e.message);
+    }
+    const remoteVideo = document.getElementById('remote-video');
+    remoteVideo.addEventListener('play', () => {
+        const ph = document.getElementById('remote-placeholder');
+        if (ph) ph.style.display = 'none';
+    });
+}
+
+function closeVideoCall() {
+    if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+    if (peerConnection) { peerConnection.close(); peerConnection = null; }
+    document.getElementById('local-video').srcObject = null;
+    document.getElementById('remote-video').srcObject = null;
+    const ph = document.getElementById('remote-placeholder');
+    if (ph) ph.style.display = 'flex';
+    activeVideoTokenId = null;
+    closeModal('video-modal');
+    if (currentUser) {
+        if (currentUser.role === 'MAIN_DOCTOR') loadMDQueues();
+        else loadPatientDashboard();
+    }
+}
+
+async function terminateVideoSession() {
+    if (!confirm('End this video session?')) return;
+    try {
+        const res = await fetch(`${API_BASE}/md/tokens/${activeVideoTokenId}/terminate`, { method: 'PUT' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        closeVideoCall();
+    } catch(e) { alert('Failed: ' + e.message); }
+}
+
+async function terminateSession() {
+    if (!confirm('End this session? This permanently locks the chat.')) return;
+    try {
+        const res = await fetch(`${API_BASE}/md/tokens/${activeChatTokenId}/terminate`, { method: 'PUT' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        document.getElementById('chat-schedule').innerText = 'Session Permanently Archived';
+        document.getElementById('chat-schedule').style.color = 'red';
+        closeChat();
+    } catch(e) { alert('Failed: ' + e.message); }
+}
+
+async function pollChatMessages() {
+    if (!activeChatTokenId) return;
+    try {
+        const res = await fetch(`${API_BASE}/chat/${activeChatTokenId}`);
+        const data = await res.json();
+        if (data.isTerminated && !document.getElementById('chat-input').disabled) {
+            document.getElementById('chat-schedule').innerText = 'Session Permanently Archived';
+            document.getElementById('chat-schedule').style.color = 'red';
+            document.getElementById('chat-input').disabled = true;
+            document.getElementById('chat-input').placeholder = 'Session Terminated.';
+            document.getElementById('chat-input').value = '';
+            document.querySelector("button[onclick='sendChatMessage()']").classList.add('hidden');
+            if (currentUser.role === 'MAIN_DOCTOR') document.getElementById('chat-terminate-btn').classList.add('hidden');
+            if (currentUser.role === 'PATIENT') loadPatientDashboard();
+        }
+        const box = document.getElementById('chat-messages');
+        let html = '';
+        data.messages.forEach(msg => {
+            const isMe = msg.senderId === currentUser.userId;
+            const al = isMe ? 'right' : 'left';
+            const bg = isMe ? 'var(--primary)' : 'rgba(255,255,255,0.1)';
+            html += `<div style="text-align:${al};margin-bottom:5px;">
+                <div style="display:inline-block;max-width:70%;background:${bg};padding:10px 15px;border-radius:15px;text-align:left;">
+                    <div style="font-size:0.75rem;opacity:0.7;margin-bottom:3px;">${msg.senderName}</div>
+                    <div>${msg.message}</div>
+                </div></div>`;
+        });
+        box.innerHTML = html;
+        box.scrollTop = box.scrollHeight;
+    } catch(e) {}
+}
+
+async function sendChatMessage() {
+    const ipt = document.getElementById('chat-input');
+    const msg = ipt.value;
+    if (!msg.trim() || !activeChatTokenId) return;
+    ipt.value = '';
+    try {
+        await fetch(`${API_BASE}/chat/${activeChatTokenId}?senderId=${currentUser.userId}`, {
+            method: 'POST', headers: {'Content-Type': 'text/plain'}, body: msg
+        });
+        pollChatMessages();
+    } catch(e) { alert('Session frozen by MD.'); }
+}
+
+// ========================
+// MAIN DOCTOR DASHBOARD
+// ========================
+async function loadMDDashboard() {
+    try {
+        const res = await fetch(`${API_BASE}/md/dashboard`);
+        const data = await res.json();
+        document.getElementById('md-rev').innerText = data.totalRevenue || '0.0';
+        document.getElementById('md-exp').innerText = data.totalExpenses || '0.0';
+        document.getElementById('md-profit').innerText = data.profitLoss || '0.0';
+        document.getElementById('md-patients').innerText = data.patientCount || '0';
+        if (document.getElementById('md-appointments-count')) document.getElementById('md-appointments-count').innerText = data.totalAppointments || '0';
+        if (document.getElementById('md-pending-refs')) document.getElementById('md-pending-refs').innerText = data.pendingReferrals || '0';
+        if (document.getElementById('md-pending-tokens')) document.getElementById('md-pending-tokens').innerText = data.pendingTokenRequests || '0';
+        if (document.getElementById('md-activity') && data.doctorActivity) {
+            const actHtml = Object.entries(data.doctorActivity).map(([name, count]) =>
+                `<div class="activity-row"><span>Dr. ${name}</span><span class="activity-badge">${count} consultations</span></div>`
+            ).join('');
+            document.getElementById('md-activity').innerHTML = actHtml || '<p class="text-muted">No activity yet.</p>';
+        }
+    } catch(e) { console.warn('Analytics fetch failed'); }
+
+    try {
+        const pRes = await fetch(`${API_BASE}/md/patients`);
+        const dRes = await fetch(`${API_BASE}/md/doctors`);
+        const patData = await pRes.json();
+        const docData = await dRes.json();
+        const pSelect = document.getElementById('md-assign-patient');
+        const dSelect = document.getElementById('md-assign-doctor');
+        if (pSelect && dSelect) {
+            pSelect.innerHTML = '<option value="">-- Select Patient --</option>' +
+                patData.map(p => `<option value="${p.id}">${p.fullName} [${p.historySummary}]</option>`).join('');
+            dSelect.innerHTML = '<option value="">-- Select Doctor --</option>' +
+                docData.map(d => `<option value="${d.id}">Dr. ${d.fullName} (${d.specialty || d.historySummary})</option>`).join('');
+        }
+    } catch(e) { console.error('Assignment fetch error'); }
+
+    await loadMDDirectory();
+}
+
+async function loadMDDirectory() {
+    try {
+        const res = await fetch(`${API_BASE}/md/doctors`);
+        const docs = await res.json();
+        const container = document.getElementById('md-directory-list');
+        if (!docs.length) { container.innerHTML = '<p class="text-muted">No Active Doctors.</p>'; return; }
+        let html = '';
+        docs.forEach(d => {
+            html += `<div class="queue-card" onclick="openMDDoctorView(${d.id}, '${d.fullName}')" style="cursor:pointer;border-left:4px solid var(--accent-1);margin-bottom:10px;">
+                <div style="flex:1;">
+                    <h4 style="margin:0;color:var(--primary);">Dr. ${d.fullName}</h4>
+                    <p class="text-muted" style="margin:5px 0 0 0;font-size:0.85rem;">Specialty: ${d.specialty || d.historySummary}</p>
+                </div>
+                <button class="submit-btn outline" style="width:auto;padding:5px 15px;">Inspect</button>
+            </div>`;
+        });
+        container.innerHTML = html;
+    } catch(e) { console.error('Directory Error', e); }
+}
+
+async function openMDDoctorView(docId, docName) {
+    document.getElementById('inspect-doc-name').innerText = 'Dr. ' + docName;
+    document.getElementById('inspect-doc-patients').innerHTML = '<p class="text-muted">Loading...</p>';
+    openModal('md-doctor-inspect-modal');
+    try {
+        const res = await fetch(`${API_BASE}/md/doctors/${docId}/patients`);
+        const pats = await res.json();
+        const container = document.getElementById('inspect-doc-patients');
+        if (!pats.length) { container.innerHTML = '<p class="text-muted">No patients assigned.</p>'; return; }
+        let html = '';
+        pats.forEach(p => {
+            const ageBadge = p.age ? `<span class="age-badge">Age: ${p.age}</span>` : '';
+            html += `<div class="queue-card" onclick="openMDPatientInspector(${p.id}, '${p.fullName}')" style="cursor:pointer;background:rgba(255,255,255,0.05);margin-bottom:10px;border-left:3px solid var(--accent-2);">
+                <div style="flex:1;"><h4 style="margin:0;">${p.fullName} ${ageBadge}</h4></div>
+                <button class="submit-btn outline" style="width:auto;padding:5px 15px;border-color:var(--accent-2);color:var(--accent-2);">View History</button>
+            </div>`;
+        });
+        container.innerHTML = html;
+    } catch(e) { document.getElementById('inspect-doc-patients').innerHTML = '<p class="error-msg">Failed.</p>'; }
+}
+
+async function openMDPatientInspector(patId, patName) {
+    closeModal('md-doctor-inspect-modal');
+    document.getElementById('inspect-pat-name').innerText = patName + ' (Clinical Timeline)';
+    document.getElementById('inspect-pat-timeline').innerHTML = '<p class="text-muted">Loading...</p>';
+    openModal('md-patient-inspect-modal');
+    try {
+        const res = await fetch(`${API_BASE}/md/patients/${patId}/history`);
+        const hist = await res.json();
+        const container = document.getElementById('inspect-pat-timeline');
+        if (!hist.length) { container.innerHTML = '<p class="text-muted">No history found.</p>'; return; }
+        let html = '';
+        hist.forEach(h => {
+            const attachHtml = h.reportsUrl ? `<a href="${h.reportsUrl}" target="_blank" style="color:var(--accent-1);font-size:0.85rem;">📎 View Report</a>` : '';
+            const rxHtml = h.prescription ? `<p style="margin:5px 0;"><strong style="color:var(--accent-2);">Rx:</strong> ${h.prescription}</p>` : '';
+            const refHtml = h.referralInfo ? `<p style="margin:5px 0;font-size:0.8rem;color:var(--text-muted);">🔁 ${h.referralInfo}</p>` : '';
+            html += `<div class="timeline-item">
+                <div class="timeline-date">${new Date(h.date).toLocaleDateString()}</div>
+                <div class="timeline-content">
+                    <h4>Dr. ${h.doctorName}</h4>
+                    <p style="margin:5px 0;"><strong>Diagnosis:</strong> ${h.notes}</p>
+                    ${rxHtml}${refHtml}${attachHtml}
+                </div>
+            </div>`;
+        });
+        container.innerHTML = html;
+    } catch(e) { document.getElementById('inspect-pat-timeline').innerHTML = '<p class="error-msg">Failed.</p>'; }
+}
+
+async function executeDirectAssignment() {
+    const pId = document.getElementById('md-assign-patient').value;
+    const dId = document.getElementById('md-assign-doctor').value;
+    const pName = document.getElementById('md-assign-patient').options[document.getElementById('md-assign-patient').selectedIndex]?.text || '';
+    const dName = document.getElementById('md-assign-doctor').options[document.getElementById('md-assign-doctor').selectedIndex]?.text || '';
+    if (!pId || !dId) return alert('Please select both a Patient and a Doctor.');
+    if (!confirm(`Assign ${pName} to ${dName}?`)) return;
+    try {
+        const res = await fetch(`${API_BASE}/md/patients/${pId}/assign?doctorId=${dId}`, { method: 'PUT' });
+        if (!res.ok) throw new Error('Server rejected.');
+        alert(`✅ Patient assigned to ${dName} successfully!`);
+        loadMDDashboard();
+    } catch(e) { alert('Failed: ' + e.message); }
+}
+
+async function loadMDQueues() {
+    try {
+        const res = await fetch(`${API_BASE}/md/queues`);
+        const data = await res.json();
+        const container = document.getElementById('md-queues');
+        container.innerHTML = '';
+        let hasItems = false;
+
+        if (data.referrals && data.referrals.length > 0) {
+            hasItems = true;
+            const docRes = await fetch(`${API_BASE}/md/doctors`);
+            const activeDocs = await docRes.json();
+            const docOptionsHtml = activeDocs.map(d => `<option value="${d.id}">Dr. ${d.fullName} (${d.specialty || d.historySummary})</option>`).join('');
+            data.referrals.forEach(r => {
+                container.innerHTML += `<div class="card" style="border-left:4px solid var(--primary);">
+                    <h4>Referral Request (ID: ${r.id})</h4>
+                    <p><strong>From:</strong> Dr. ${r.fromDoctor}</p>
+                    <p><strong>Patient:</strong> ${r.patientName}</p>
+                    <p><strong>Dept:</strong> ${r.requestedSpecialty} — Urgency: <span style="color:var(--accent-1);font-weight:bold;">${r.urgency}</span></p>
+                    <p><strong>Reason:</strong> "${r.reason}"</p>
+                    <div class="card-actions mt-2" style="align-items:center;">
+                        <select id="assign-doc-${r.id}" class="modal-input" style="max-width:280px;margin:0;">
+                            <option value="">-- Assign Doctor --</option>${docOptionsHtml}
+                        </select>
+                        <button class="submit-btn" style="padding:10px;width:auto;margin:0;" onclick="processReferral(${r.id}, true)">Approve</button>
+                        <button class="submit-btn danger" style="padding:10px;width:auto;margin:0;" onclick="processReferral(${r.id}, false)">Reject</button>
+                    </div>
+                </div>`;
+            });
+        }
+
+        if (data.tokens && data.tokens.length > 0) {
+            hasItems = true;
+            data.tokens.forEach(t => {
+                container.innerHTML += `<div class="card" style="border-left:4px solid var(--accent-1);">
+                    <h4>${t.type} Request (ID: ${t.id})</h4>
+                    <p><strong>Patient:</strong> ${t.patientName}</p>
+                    <div class="card-actions mt-2">
+                        <button class="submit-btn" style="padding:8px;" onclick="processToken(${t.id}, true)">Approve & Schedule</button>
+                        <button class="submit-btn danger" style="padding:8px;" onclick="processToken(${t.id}, false)">Reject</button>
+                    </div>
+                </div>`;
+            });
+        }
+
+        if (!hasItems) container.innerHTML = '<p class="text-muted" style="padding:20px;">No pending actions.</p>';
+
+        const aptRes = await fetch(`${API_BASE}/md/appointments`);
+        const aptData = await aptRes.json();
+        const aptContainer = document.getElementById('md-appointments');
+        aptContainer.innerHTML = '';
+        if (aptData.length === 0) {
+            aptContainer.innerHTML = '<p class="text-muted" style="padding:20px;">No active sessions.</p>';
+        } else {
+            aptData.forEach(a => {
+                const btnHtml = renderTimeStatusButton(a);
+                const schedInfo = a.scheduledTime
+                    ? `<small style="color:var(--accent-1);">📅 ${new Date(a.scheduledTime).toLocaleString([], {dateStyle:'short', timeStyle:'short'})}</small>`
+                    : '';
+                const icon = a.type === 'VIDEO' ? '📹' : '💬';
+                aptContainer.innerHTML += `<div class="card" style="display:flex;justify-content:space-between;align-items:center;border-left:4px solid var(--success);">
+                    <div>
+                        <h4 style="margin:0;">${icon} Patient: ${a.patientName} (${a.type})</h4>
+                        ${schedInfo}
+                    </div>
+                    <div>${btnHtml}</div>
+                </div>`;
+            });
+        }
+    } catch(e) { console.error('Queue fetch error', e); }
+}
+
+async function processReferral(id, approve) {
+    let url = `${API_BASE}/md/referrals/${id}/assign?approve=${approve}`;
+    if (approve) {
+        const selectBox = document.getElementById(`assign-doc-${id}`);
+        if (!selectBox.value) return alert('Select a Doctor to assign!');
+        url += `&assignedDoctorId=${selectBox.value}`;
+    }
+    try {
+        await fetch(url, { method: 'PUT' });
+        alert(approve ? 'Referral approved & patient transferred.' : 'Referral rejected.');
+        loadMDQueues();
+    } catch(e) { alert('Failed.'); }
+}
+
+function processToken(id, approve) {
+    if (approve) {
+        document.getElementById('assign-token-id').value = id;
+        document.getElementById('assign-time').value = '';
+        openModal('md-assign-modal');
+    } else {
+        fetch(`${API_BASE}/md/tokens/${id}?approve=false`, { method: 'PUT' }).then(() => loadMDQueues());
+    }
+}
+
+async function submitTokenApproval() {
+    const id = document.getElementById('assign-token-id').value;
+    const sched = document.getElementById('assign-time').value;
+    if (!sched) return alert('Select a scheduled time!');
+    await fetch(`${API_BASE}/md/tokens/${id}?approve=true&scheduledTime=${encodeURIComponent(sched)}`, { method: 'PUT' });
+    closeModal('md-assign-modal');
+    loadMDQueues();
+}
+
+async function submitPromote() {
+    const email = document.getElementById('prom-email').value;
+    const name = document.getElementById('prom-name').value;
+    const role = document.getElementById('prom-role').value;
+    try {
+        const res = await fetch(`${API_BASE}/md/promote?email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}&role=${role}`, { method: 'POST' });
+        if (!res.ok) throw new Error('Failed');
+        alert('User role updated. New users get password: temp@123');
+        closeModal('promote-modal');
+        loadMDDashboard();
+    } catch(e) { alert('Failed.'); }
+}
+
+function downloadReport(type, format) {
+    const map = {
+        revenue:  { pdf: `${API_BASE}/md/reports/revenue/pdf`,  excel: `${API_BASE}/md/reports/revenue/excel` },
+        expenses: { pdf: `${API_BASE}/md/reports/expenses/pdf`, excel: `${API_BASE}/md/reports/expenses/excel` },
+        doctors:  { pdf: `${API_BASE}/md/reports/doctors/pdf`,  excel: `${API_BASE}/md/reports/doctors/excel` }
+    };
+    const url = map[type][format];
+    const ext = format === 'pdf' ? 'pdf' : 'xlsx';
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${type}_report.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
+async function postSocial() {
+    const title = document.getElementById('ps-title').value;
+    const content = document.getElementById('ps-content').value;
+    const mediaUrl = document.getElementById('ps-media') ? document.getElementById('ps-media').value : '';
+    if (!title || !content) return alert('Title and Content are required!');
+    try {
+        const res = await fetch(`${API_BASE}/md/social?mdId=${currentUser.userId}&title=${encodeURIComponent(title)}&content=${encodeURIComponent(content)}&mediaUrl=${encodeURIComponent(mediaUrl)}`, { method: 'POST' });
+        if (res.ok) {
+            alert('✅ Broadcast published!');
+            document.getElementById('post-social-modal').classList.remove('show');
+            document.getElementById('ps-title').value = '';
+            document.getElementById('ps-content').value = '';
+            if (document.getElementById('ps-media')) document.getElementById('ps-media').value = '';
+            loadSocialFeed();
+        }
+    } catch(e) { alert('Failed to post'); }
+}
+
+// ========================
+// DOCTOR DASHBOARD
+// ========================
+async function loadDoctorDashboard() {
+    const list = document.getElementById('doctor-patients-list');
+    try {
+        const res = await fetch(`${API_BASE}/doctor/${currentUser.userId}/patients`);
+        const data = await res.json();
+        list.innerHTML = '';
+        if (data.length === 0) { list.innerHTML = '<p class="text-muted" style="padding:20px;">No patients assigned.</p>'; return; }
+        data.forEach(p => {
+            const escapedName = p.fullName.replace(/'/g, "\\'");
+            const ageBadge = p.age ? `<span class="age-badge">Age: ${p.age}</span>` : '';
+            const lastVisit = p.lastConsultation ? `<small class="text-muted" style="float:right;">Last: ${new Date(p.lastConsultation).toLocaleDateString()}</small>` : '';
+            list.innerHTML += `<div class="card" style="border-left:4px solid var(--accent-1);">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <h4>ID ${p.id}: ${p.fullName} ${ageBadge}</h4>${lastVisit}
+                </div>
+                <p><strong>Summary:</strong> ${p.historySummary}</p>
+                <div class="card-actions mt-2">
+                    <button class="submit-btn" style="padding:8px 15px;width:auto;" onclick="prepareConsultation(${p.id}, '${escapedName}')">📝 Update Notes</button>
+                    <button class="submit-btn outline" style="padding:8px 15px;width:auto;" onclick="prepareReferral(${p.id}, '${escapedName}')">🔄 Refer</button>
+                    <button class="submit-btn outline" style="padding:8px 15px;width:auto;border-color:var(--accent-1);" onclick="openMDPatientInspector(${p.id}, '${escapedName}')">📋 Full History</button>
+                </div>
+            </div>`;
+        });
+    } catch(e) { list.innerHTML = '<p class="text-danger">Failed to load.</p>'; }
+}
+
+function prepareConsultation(patientId, patientName) {
+    document.getElementById('consult-patient-id').value = patientId;
+    document.getElementById('consult-patient-name').innerText = 'Patient: ' + patientName;
+    document.getElementById('consult-notes').value = '';
+    document.getElementById('consult-prescription').value = '';
+    document.getElementById('consult-report').value = '';
+    openModal('add-patient-modal');
+}
+
+async function addConsultation() {
+    const pId = document.getElementById('consult-patient-id').value;
+    const notes = document.getElementById('consult-notes').value;
+    const rx = document.getElementById('consult-prescription').value;
+    const rep = document.getElementById('consult-report').value;
+    if (!notes || !rx) return alert('Diagnosis and Prescription required!');
+    try {
+        await fetch(`${API_BASE}/doctor/${currentUser.userId}/consultations?patientId=${pId}&notes=${encodeURIComponent(notes)}&prescription=${encodeURIComponent(rx)}&reportsUrl=${encodeURIComponent(rep)}`, { method: 'POST' });
+        alert('Clinical record saved!');
+        closeModal('add-patient-modal');
+        loadDoctorDashboard();
+    } catch(e) { alert('Failed.'); }
+}
+
+function prepareReferral(patientId, patientName) {
+    document.getElementById('ref-patient-id').value = patientId;
+    document.getElementById('ref-patient-name').innerText = 'Patient: ' + patientName;
+    document.getElementById('ref-reason').value = '';
+    openModal('refer-modal');
+}
+
+async function sendReferral() {
+    const pId = document.getElementById('ref-patient-id').value;
+    const specialty = document.getElementById('ref-specialty').value;
+    const reason = document.getElementById('ref-reason').value;
+    const urgency = document.getElementById('ref-urgency').value;
+    if (!reason) return alert('Reason required.');
+    try {
+        await fetch(`${API_BASE}/doctor/${currentUser.userId}/referrals`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ patientId: pId, requestedSpecialty: specialty, urgency: urgency, reason: reason })
+        });
+        alert('Referral sent to MD for approval.');
+        closeModal('refer-modal');
+    } catch(e) { alert('Failed.'); }
+}
+
+// ========================
+// PATIENT DASHBOARD
+// ========================
+async function loadPatientDashboard() {
+    const list = document.getElementById('patient-timeline');
+    try {
+        const res = await fetch(`${API_BASE}/patient/${currentUser.userId}/history`);
+        const data = await res.json();
+        list.innerHTML = '';
+        if (data.length === 0) { list.innerHTML = '<p class="text-muted" style="padding:20px;">No medical records found.</p>'; }
+        else {
+            data.forEach(item => {
+                list.innerHTML += `<div class="timeline-item">
+                    <div class="timeline-date">${new Date(item.date).toLocaleDateString()}</div>
+                    <div class="timeline-content">
+                        <h4>Dr. ${item.doctorName}</h4>
+                        <p><strong>Diagnosis:</strong> ${item.notes}</p>
+                        ${item.prescription ? `<p style="color:var(--accent-2);"><strong>Rx:</strong> ${item.prescription}</p>` : ''}
+                        ${item.referralInfo ? `<p style="font-size:0.8rem;color:var(--text-muted);">🔁 ${item.referralInfo}</p>` : ''}
+                        ${item.reportsUrl ? `<a href="${item.reportsUrl}" target="_blank" style="color:var(--accent-1);">📎 View Report</a>` : ''}
+                    </div>
+                </div>`;
+            });
+        }
+    } catch(e) { list.innerHTML = '<p class="text-danger">Failed to load.</p>'; }
+
+    const aptContainer = document.getElementById('patient-appointments');
+    try {
+        const tRes = await fetch(`${API_BASE}/patient/${currentUser.userId}/tokens`);
+        const tData = await tRes.json();
+        aptContainer.innerHTML = '';
+        let hasActives = false;
+        let blockNewRequests = false;
+        tData.forEach(tk => {
+            if (tk.status === 'APPROVED') {
+                blockNewRequests = true; hasActives = true;
+                const btnHtml = renderTimeStatusButton(tk);
+                const schedInfo = tk.scheduledTime
+                    ? `<small style="color:var(--accent-1);">📅 ${new Date(tk.scheduledTime).toLocaleString([], {dateStyle:'short', timeStyle:'short'})}</small>`
+                    : '';
+                const icon = tk.type === 'VIDEO' ? '📹' : '💬';
+                aptContainer.innerHTML += `<div class="card" style="display:flex;justify-content:space-between;align-items:center;border-left:4px solid var(--success);">
+                    <div>
+                        <h4 style="margin:0;">${icon} Meeting with MD (${tk.type}) — Approved</h4>
+                        ${schedInfo}
+                    </div>
+                    <div>${btnHtml}</div>
+                </div>`;
+            } else if (tk.status === 'REQUESTED') {
+                blockNewRequests = true; hasActives = true;
+                aptContainer.innerHTML += `<div class="card" style="border-left:4px solid var(--accent-1);">
+                    <h4>⏳ ${tk.type} Session — Pending MD Approval</h4>
+                    <p>Your request has been sent. Waiting for MD to schedule a time.</p>
+                </div>`;
+            }
+        });
+        const reqBtn = document.getElementById('patient-request-token-btn');
+        if (blockNewRequests) {
+            reqBtn.disabled = true;
+            reqBtn.innerText = 'Request MD Token (Pending)';
+            reqBtn.classList.add('outline');
+        } else {
+            reqBtn.disabled = false;
+            reqBtn.innerText = '💬 Request MD Token';
+            reqBtn.classList.remove('outline');
+        }
+        if (!hasActives) aptContainer.innerHTML = '<p class="text-muted" style="padding:20px;">No active appointments.</p>';
+    } catch(e) {}
+}
+
+async function requestToken() {
+    const type = document.getElementById('token-type').value;
+    try {
+        let mdId = 1;
+        try {
+            const mdRes = await fetch(`${API_BASE}/md/admin-id`);
+            if (mdRes.ok) mdId = await mdRes.json();
+        } catch(e) {}
+        const res = await fetch(`${API_BASE}/patient/tokens`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ patientId: currentUser.userId, mdId: mdId, type: type })
+        });
+        if (!res.ok) throw new Error('Server rejected token request');
+        alert('✅ Token request sent to MD successfully!');
+        document.getElementById('token-modal').classList.remove('show');
+        loadPatientDashboard();
+    } catch(e) { alert('Failed: ' + e.message); }
+}
+
+// ========================
+// SHARED
+// ========================
+async function loadSocialFeed() {
+    try {
+        const res = await fetch(`${API_BASE}/shared/social`);
+        const data = await res.json();
+        const feed = document.getElementById('social-feed');
+        feed.innerHTML = '';
+        if (data.length === 0) { feed.innerHTML = '<p class="text-muted">No broadcasts yet.</p>'; return; }
+        data.forEach(post => {
+            let mediaHtml = '';
+            if (post.mediaUrl) {
+                if (post.mediaUrl.includes('youtube.com') || post.mediaUrl.includes('youtu.be')) {
+                    const vid = post.mediaUrl.includes('v=') ? post.mediaUrl.split('v=')[1].split('&')[0] : post.mediaUrl.split('/').pop();
+                    mediaHtml = `<iframe width="100%" height="180" src="https://www.youtube.com/embed/${vid}" frameborder="0" allowfullscreen></iframe>`;
+                } else if (post.mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+                    mediaHtml = `<img src="${post.mediaUrl}" style="width:100%;border-radius:8px;margin-top:8px;"/>`;
+                } else {
+                    mediaHtml = `<a href="${post.mediaUrl}" target="_blank" style="color:var(--accent-1);display:block;margin-top:6px;">🔗 ${post.mediaUrl}</a>`;
+                }
+            }
+            feed.innerHTML += `<div class="social-post">
+                <small style="color:var(--primary);">${new Date(post.postedAt).toLocaleString()}</small>
+                <h4>${post.title}</h4>
+                <p>${post.content}</p>
+                ${mediaHtml}
+            </div>`;
+        });
+    } catch(e) {}
+}
+
+// FIX 5 & 6: Launchpad visible for all roles, MD sees submissions, others see submit form
+async function handleLaunchpadClick() {
+    if (currentUser.role === 'MAIN_DOCTOR') {
+        openModal('md-launchpad-modal');
+        const feed = document.getElementById('md-launchpad-feed');
+        feed.innerHTML = 'Loading...';
+        try {
+            const res = await fetch(`${API_BASE}/md/launchpad`);
+            const data = await res.json();
+            feed.innerHTML = '';
+            if (data.length === 0) { feed.innerHTML = '<p class="text-muted">No ideas received.</p>'; return; }
+            data.forEach(idea => {
+                feed.innerHTML += `<div class="card" style="margin-bottom:10px;">
+                    <small>Domain: ${idea.domain}</small>
+                    <h4 style="margin:5px 0;">${idea.ideaTitle}</h4>
+                    <p>${idea.description}</p>
+                    <div style="background:var(--input-bg);padding:10px;border-radius:8px;margin-top:5px;">
+                        <small style="display:block;color:var(--primary);">Contact: ${idea.submitterEmail}</small>
+                        <small style="display:block;color:white;">Info: ${idea.contactInfo || 'N/A'}</small>
+                    </div>
+                </div>`;
+            });
+        } catch(e) { feed.innerHTML = '<p class="text-danger">Failed.</p>'; }
+    } else {
+        openModal('launchpad-modal');
+    }
+}
+
+async function submitLaunchpad() {
+    const title = document.getElementById('lp-title').value;
+    const desc = document.getElementById('lp-desc').value;
+    const domain = document.getElementById('lp-domain').value;
+    if (!title || !desc) return alert('Title and Description are required!');
+    const pLoad = {
+        submitterId: currentUser.userId,
+        ideaTitle: title,
+        description: desc,
+        domain: domain,
+        contactInfo: document.getElementById('lp-contact') ? document.getElementById('lp-contact').value : ''
+    };
+    try {
+        const res = await fetch(`${API_BASE}/shared/launchpad`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(pLoad)
+        });
+        if (!res.ok) throw new Error('Server error');
+        alert('✅ Idea submitted to MD LaunchPad!');
+        document.getElementById('launchpad-modal').classList.remove('show');
+        ['lp-title','lp-desc','lp-domain','lp-contact'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+    } catch(e) { alert('Failed: ' + e.message); }
+}
+
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) {
+    document.getElementById(id).classList.remove('show');
+    document.querySelectorAll(`#${id} input:not([type=hidden]), #${id} textarea`).forEach(el => { el.value = ''; });
+}
+
+function toggleDropdown(id) {
+    const menu = document.getElementById(id);
+    const isOpen = menu.classList.contains('open');
+    document.querySelectorAll('.dropdown-menu.open').forEach(m => m.classList.remove('open'));
+    if (!isOpen) menu.classList.add('open');
+}
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.dropdown')) document.querySelectorAll('.dropdown-menu.open').forEach(m => m.classList.remove('open'));
+});
+
+// ========================
+// FILE UPLOAD
+// ========================
+function handleFileSelect() {
+    const file = document.getElementById('consult-report-file').files[0];
+    const status = document.getElementById('upload-status');
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        document.getElementById('consult-report').value = e.target.result;
+        status.innerText = 'File loaded: ' + file.name + ' (' + (file.size/1024).toFixed(1) + ' KB)';
+    };
+    reader.readAsDataURL(file);
+}
+
+// ========================
+// FINANCIAL RECORDS
+// ========================
+async function addFinancialRecord() {
+    const type = document.getElementById('finance-type').value;
+    const amount = document.getElementById('finance-amount').value;
+    const desc = document.getElementById('finance-desc').value;
+    if (!amount || amount <= 0) return alert('Enter a valid amount.');
+    if (!desc) return alert('Enter a description.');
+    try {
+        await fetch(`${API_BASE}/md/finance`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ type, amount: parseFloat(amount), description: desc })
+        });
+    } catch(e) {}
+    alert('Financial record added! Dashboard updated.');
+    closeModal('finance-modal');
+    loadMDDashboard();
+}
+
+// ========================
+// CHATBOT
+// ========================
+const chatbotKB = {
+    revenue: 'Total Revenue = all money earned by the hospital (consultation fees, procedures, etc). To add: Login as Main Doctor → click "Add Finance Record" → select Revenue → enter amount and description.',
+    expense: 'Total Expenses = all money spent (equipment, salaries, medicines). To add: Login as Main Doctor → click "Add Finance Record" → select Expenditure → enter amount.',
+    profit: 'Profit/Loss = Total Revenue minus Total Expenses. Positive = profit, Negative = loss. Values update when you add financial records.',
+    finance: 'To change revenue/expense values: Login as Main Doctor → click "Add Finance Record" → select type (Revenue or Expenditure) → enter amount and description → click Add Record.',
+    chat: 'To start a chat session: 1) Patient clicks "Request MD Token" and selects Chat. 2) Main Doctor approves and schedules a time. 3) Both patient and MD see a "Join Chat" button. 4) Both can chat in the live window.',
+    video: 'Video call: Patient requests VIDEO token → MD approves and schedules → both see "Join Video Call" button → camera opens for the session.',
+    token: 'Token system: Patient requests token (Chat or Video) → MD approves and sets time → patient joins. MD can freeze or terminate any session.',
+    referral: 'Referral flow: Doctor clicks Refer on a patient → fills reason and specialty → request goes to MD pending queue → MD approves and assigns to another doctor.',
+    assign: 'To assign a patient to a doctor: Login as Main Doctor → scroll to "Direct Patient Assignment" → select patient and doctor → click Assign Now.',
+    role: '3 roles: Main Doctor (admin) has full control. Doctor manages assigned patients. Patient registers themselves and can request consultations.',
+    login: 'Default logins: Main Doctor: admin@123 / admin, Doctor: doctor@123 / doctor. Patients self-register. New users from MD get password temp@123.',
+    report: 'Download reports from MD dashboard: Revenue Report, Expense Report, Doctor Stats — available as PDF or Excel.',
+    launchpad: 'LaunchPad: Doctors and patients submit ideas → fill title, description, domain, contact → submit. Main Doctor views all submissions.',
+    social: 'Social Feed: Only Main Doctor can post (text, YouTube links, images). Everyone can view by clicking Social Feed in navbar.',
+    password: 'Forgot password: Click Forgot Password on login → enter email → OTP appears in Spring Boot console → enter OTP and new password.',
+    default: 'I can help with: revenue/expenses, chat/video sessions, token requests, referrals, patient assignment, roles, reports, launchpad, social feed, passwords. What would you like to know?'
+};
+
+function toggleChatbot() {
+    const box = document.getElementById('chatbot-box');
+    box.classList.toggle('hidden');
+    if (!box.classList.contains('hidden') && document.getElementById('chatbot-messages').children.length === 0) {
+        addBotMsg('Hello! I am TelePatient Assistant. Ask me anything about how this system works.');
+    }
+}
+
+function addBotMsg(text) {
+    const box = document.getElementById('chatbot-messages');
+    const div = document.createElement('div');
+    div.style.cssText = 'text-align:left;margin-bottom:8px;';
+    div.innerHTML = `<div style="display:inline-block;max-width:90%;background:rgba(59,130,246,0.2);padding:10px 14px;border-radius:4px 14px 14px 14px;font-size:0.85rem;line-height:1.5;">${text}</div>`;
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+}
+
+function addUserMsg(text) {
+    const box = document.getElementById('chatbot-messages');
+    const div = document.createElement('div');
+    div.style.cssText = 'text-align:right;margin-bottom:8px;';
+    div.innerHTML = `<div style="display:inline-block;max-width:90%;background:var(--primary);padding:10px 14px;border-radius:14px 4px 14px 14px;font-size:0.85rem;">${text}</div>`;
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+}
+
+function sendChatbotMessage() {
+    const input = document.getElementById('chatbot-input');
+    const msg = input.value.trim();
+    if (!msg) return;
+    input.value = '';
+    addUserMsg(msg);
+    const lower = msg.toLowerCase();
+    let response = chatbotKB.default;
+    if (lower.includes('revenue') || lower.includes('income')) response = chatbotKB.revenue;
+    else if (lower.includes('expense') || lower.includes('expenditure') || lower.includes('cost')) response = chatbotKB.expense;
+    else if (lower.includes('profit') || lower.includes('loss')) response = chatbotKB.profit;
+    else if (lower.includes('finance') || lower.includes('money')) response = chatbotKB.finance;
+    else if (lower.includes('chat') || lower.includes('message')) response = chatbotKB.chat;
+    else if (lower.includes('video') || lower.includes('call') || lower.includes('camera')) response = chatbotKB.video;
+    else if (lower.includes('token') || lower.includes('meeting') || lower.includes('request')) response = chatbotKB.token;
+    else if (lower.includes('referral') || lower.includes('refer') || lower.includes('transfer')) response = chatbotKB.referral;
+    else if (lower.includes('assign') || (lower.includes('patient') && lower.includes('doctor'))) response = chatbotKB.assign;
+    else if (lower.includes('role') || lower.includes('promote') || lower.includes('admin')) response = chatbotKB.role;
+    else if (lower.includes('login') || (lower.includes('password') && lower.includes('default'))) response = chatbotKB.login;
+    else if (lower.includes('report') || lower.includes('download')) response = chatbotKB.report;
+    else if (lower.includes('launchpad') || lower.includes('idea')) response = chatbotKB.launchpad;
+    else if (lower.includes('social') || lower.includes('post') || lower.includes('feed')) response = chatbotKB.social;
+    else if (lower.includes('password') || lower.includes('otp') || lower.includes('forgot')) response = chatbotKB.password;
+    setTimeout(() => addBotMsg(response), 400);
+}
+
