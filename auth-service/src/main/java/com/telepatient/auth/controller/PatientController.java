@@ -30,4 +30,12 @@ public class PatientController {
     public ResponseEntity<List<com.telepatient.auth.entity.CommunicationToken>> viewMyTokens(@PathVariable Long patientId) {
         return ResponseEntity.ok(patientService.getPatientTokens(patientId));
     }
+
+    @PostMapping("/{patientId}/emergency")
+    public ResponseEntity<String> triggerEmergency(
+            @PathVariable Long patientId,
+            @RequestParam(defaultValue = "CRITICAL") String level) {
+        String msg = patientService.triggerEmergencyAlert(patientId, level);
+        return ResponseEntity.ok(msg);
+    }
 }

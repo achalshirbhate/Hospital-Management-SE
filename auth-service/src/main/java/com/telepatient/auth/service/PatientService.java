@@ -9,4 +9,5 @@ public interface PatientService {
     List<HistoryDTO> getPatientHistory(Long patientId);
     void requestCommunicationToken(TokenRequestDTO request);
     List<CommunicationToken> getPatientTokens(Long patientId);
+    String triggerEmergencyAlert(Long patientId, String level);
 }

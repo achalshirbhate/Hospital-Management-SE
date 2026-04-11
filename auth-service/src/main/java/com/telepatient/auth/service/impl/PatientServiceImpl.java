@@ -4,6 +4,8 @@ import com.telepatient.auth.dto.request.TokenRequestDTO;
 import com.telepatient.auth.dto.response.HistoryDTO;
 import com.telepatient.auth.entity.*;
 import com.telepatient.auth.repository.*;
+import com.telepatient.auth.entity.EmergencyAlert;
+import com.telepatient.auth.repository.EmergencyAlertRepository;
 import com.telepatient.auth.service.PatientService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,6 +20,7 @@ public class PatientServiceImpl implements PatientService {
     private final ConsultationRepository consultationRepo;
     private final CommunicationTokenRepository tokenRepo;
     private final UserRepository userRepo;
+    private final EmergencyAlertRepository emergencyRepo;
 
     @Override
     public List<HistoryDTO> getPatientHistory(Long patientId) {
@@ -56,5 +59,21 @@ public class PatientServiceImpl implements PatientService {
     public List<CommunicationToken> getPatientTokens(Long patientId) {
         User patient = userRepo.findById(patientId).orElseThrow();
         return tokenRepo.findByPatient(patient);
+    }
+
+    @Override
+    public String triggerEmergencyAlert(Long patientId, String level) {
+        User patient = userRepo.findById(patientId).orElseThrow();
+        EmergencyAlert alert = EmergencyAlert.builder()
+                .patient(patient)
+                .level(level)
+                .alertTime(LocalDateTime.now())
+                .acknowledged(false)
+                .build();
+        emergencyRepo.save(alert);
+        System.out.println("\n========================================");
+        System.out.println("🚨 [" + level + "] EMERGENCY from: " + patient.getFullName() + " at " + alert.getAlertTime());
+        System.out.println("========================================\n");
+        return "Emergency alert sent. Hospital counter has been notified!";
     }
 }

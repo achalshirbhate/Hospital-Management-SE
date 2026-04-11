@@ -1,6 +1,9 @@
 package com.telepatient.auth.controller;
 
 import com.telepatient.auth.service.DashboardService;
+import com.telepatient.auth.dto.response.EmergencyAlertDTO;
+import com.telepatient.auth.repository.EmergencyAlertRepository;
+import com.telepatient.auth.entity.EmergencyAlert;
 import com.telepatient.auth.dto.response.DashboardDTO;
 import com.telepatient.auth.dto.response.LaunchpadResponseDTO;
 import com.telepatient.auth.dto.response.PendingQueueDTO;
@@ -25,6 +28,7 @@ public class MDController {
     private final DoctorService doctorService;
     private final PatientService patientService;
     private final DashboardService dashboardService;
+    private final EmergencyAlertRepository emergencyRepo;
 
     @GetMapping("/admin-id")
     public ResponseEntity<Long> getAdminId() {
@@ -188,5 +192,27 @@ public class MDController {
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=doctor_stats.pdf")
             .contentType(MediaType.APPLICATION_PDF)
             .body(((com.telepatient.auth.service.impl.DashboardServiceImpl) dashboardService).generateDoctorStatsPdf());
+    }
+
+    @GetMapping("/emergencies")
+    public ResponseEntity<List<EmergencyAlertDTO>> getEmergencies() {
+        List<EmergencyAlertDTO> list = emergencyRepo.findByAcknowledgedFalseOrderByAlertTimeDesc()
+            .stream().map(e -> EmergencyAlertDTO.builder()
+                .id(e.getId())
+                .patientName(e.getPatient().getFullName())
+                .level(e.getLevel())
+                .alertTime(e.getAlertTime())
+                .build())
+            .collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(list);
+    }
+
+    @PutMapping("/emergencies/{id}/acknowledge")
+    public ResponseEntity<String> acknowledgeEmergency(@PathVariable Long id) {
+        emergencyRepo.findById(id).ifPresent(e -> {
+            e.setAcknowledged(true);
+            emergencyRepo.save(e);
+        });
+        return ResponseEntity.ok("Acknowledged");
     }
 }

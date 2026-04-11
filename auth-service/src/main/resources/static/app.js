@@ -150,13 +150,21 @@ function initApp(userData) {
     document.getElementById('patient-dashboard').classList.add('hidden');
     if (userData.role === 'MAIN_DOCTOR') {
         document.getElementById('md-dashboard').classList.remove('hidden');
+        const fab = document.getElementById('emergency-fab');
+        if (fab) fab.style.display = 'none';
         loadMDDashboard();
         loadMDQueues();
+        loadMDEmergencyQueue();
+        setInterval(loadMDEmergencyQueue, 8000);
     } else if (userData.role === 'DOCTOR') {
         document.getElementById('doctor-dashboard').classList.remove('hidden');
+        const fab = document.getElementById('emergency-fab');
+        if (fab) fab.style.display = 'none';
         loadDoctorDashboard();
     } else {
         document.getElementById('patient-dashboard').classList.remove('hidden');
+        const fab = document.getElementById('emergency-fab');
+        if (fab) fab.style.display = 'block';
         loadPatientDashboard();
     }
     loadSocialFeed();
@@ -596,30 +604,108 @@ async function postSocial() {
 // ========================
 // DOCTOR DASHBOARD
 // ========================
+let allDoctorPatients = [];
+
 async function loadDoctorDashboard() {
     const list = document.getElementById('doctor-patients-list');
+    // Show skeleton
+    list.innerHTML = `<div class="doc-skeleton">
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+    </div>`;
+
     try {
         const res = await fetch(`${API_BASE}/doctor/${currentUser.userId}/patients`);
-        const data = await res.json();
-        list.innerHTML = '';
-        if (data.length === 0) { list.innerHTML = '<p class="text-muted" style="padding:20px;">No patients assigned.</p>'; return; }
-        data.forEach(p => {
-            const escapedName = p.fullName.replace(/'/g, "\\'");
-            const ageBadge = p.age ? `<span class="age-badge">Age: ${p.age}</span>` : '';
-            const lastVisit = p.lastConsultation ? `<small class="text-muted" style="float:right;">Last: ${new Date(p.lastConsultation).toLocaleDateString()}</small>` : '';
-            list.innerHTML += `<div class="card" style="border-left:4px solid var(--accent-1);">
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <h4>ID ${p.id}: ${p.fullName} ${ageBadge}</h4>${lastVisit}
+        allDoctorPatients = await res.json();
+        updateDoctorStats(allDoctorPatients);
+        applyDoctorFilters();
+    } catch(e) {
+        list.innerHTML = `<div class="doc-empty"><div class="doc-empty-icon">⚠️</div><div class="doc-empty-text">Failed to load patients</div><div class="doc-empty-sub">Check your connection and try again.</div></div>`;
+    }
+}
+
+function updateDoctorStats(data) {
+    const total     = data.length;
+    const active    = data.filter(p => p.lastConsultation).length;
+    const referred  = data.filter(p => p.historySummary && p.historySummary.toLowerCase().includes('refer')).length;
+    const noHistory = data.filter(p => !p.lastConsultation).length;
+    document.getElementById('doc-stat-total').innerText     = total;
+    document.getElementById('doc-stat-active').innerText    = active;
+    document.getElementById('doc-stat-referred').innerText  = referred;
+    document.getElementById('doc-stat-nohistory').innerText = noHistory;
+}
+
+function applyDoctorFilters() {
+    const search = (document.getElementById('doc-search')?.value || '').toLowerCase();
+    const status = document.getElementById('doc-filter-status')?.value || 'all';
+    const sort   = document.getElementById('doc-sort')?.value || 'latest';
+
+    let filtered = allDoctorPatients.filter(p => {
+        const matchName = !search || p.fullName.toLowerCase().includes(search);
+        const isActive    = !!p.lastConsultation;
+        const isReferred  = p.historySummary?.toLowerCase().includes('refer');
+        const isNoHistory = !p.lastConsultation;
+        const matchStatus = status === 'all'
+            || (status === 'active'    && isActive)
+            || (status === 'referred'  && isReferred)
+            || (status === 'nohistory' && isNoHistory);
+        return matchName && matchStatus;
+    });
+
+    if (sort === 'latest') filtered.sort((a, b) => new Date(b.lastConsultation || 0) - new Date(a.lastConsultation || 0));
+    else if (sort === 'oldest') filtered.sort((a, b) => new Date(a.lastConsultation || 0) - new Date(b.lastConsultation || 0));
+    else if (sort === 'name') filtered.sort((a, b) => a.fullName.localeCompare(b.fullName));
+
+    renderDoctorPatients(filtered);
+}
+
+function renderDoctorPatients(data) {
+    const list = document.getElementById('doctor-patients-list');
+    if (!data.length) {
+        list.innerHTML = `<div class="doc-empty">
+            <div class="doc-empty-icon">🏥</div>
+            <div class="doc-empty-text">No patients found</div>
+            <div class="doc-empty-sub">Try adjusting your search or filter.</div>
+        </div>`;
+        return;
+    }
+
+    list.innerHTML = data.map(p => {
+        const name = p.fullName.replace(/'/g, "\\'");
+        const lastVisit = p.lastConsultation
+            ? new Date(p.lastConsultation).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })
+            : null;
+        const isActive   = !!p.lastConsultation;
+        const isReferred = p.historySummary?.toLowerCase().includes('refer');
+        const dotColor   = isReferred ? '#f59e0b' : isActive ? '#22c55e' : '#94a3b8';
+        const statusLabel = isReferred ? '🔁 Referred' : isActive ? '✅ Active' : '⏳ No History';
+        const summary = p.historySummary && p.historySummary !== 'No history available'
+            ? p.historySummary : '';
+
+        return `<div class="patient-card">
+            <div class="patient-card-left">
+                <div class="patient-card-name">
+                    <span class="patient-status-dot" style="background:${dotColor};"></span>
+                    ${p.fullName}
+                    <span class="patient-id-badge">ID ${p.id}</span>
+                    ${p.age ? `<span class="age-badge">Age ${p.age}</span>` : ''}
                 </div>
-                <p><strong>Summary:</strong> ${p.historySummary}</p>
-                <div class="card-actions mt-2">
-                    <button class="submit-btn" style="padding:8px 15px;width:auto;" onclick="prepareConsultation(${p.id}, '${escapedName}')">📝 Update Notes</button>
-                    <button class="submit-btn outline" style="padding:8px 15px;width:auto;" onclick="prepareReferral(${p.id}, '${escapedName}')">🔄 Refer</button>
-                    <button class="submit-btn outline" style="padding:8px 15px;width:auto;border-color:var(--accent-1);" onclick="openMDPatientInspector(${p.id}, '${escapedName}')">📋 Full History</button>
+                <div class="patient-meta">
+                    ${lastVisit ? `<span>📅 Last visit: ${lastVisit}</span>` : '<span style="color:#94a3b8;">No visits yet</span>'}
+                    <span>${statusLabel}</span>
                 </div>
-            </div>`;
-        });
-    } catch(e) { list.innerHTML = '<p class="text-danger">Failed to load.</p>'; }
+                ${summary ? `<div class="patient-summary">${summary}</div>` : ''}
+            </div>
+            <div class="patient-card-actions">
+                <button class="patient-action-btn primary" onclick="prepareConsultation(${p.id}, '${name}')">📝 Notes</button>
+                <button class="patient-action-btn" onclick="prepareReferral(${p.id}, '${name}')">🔄 Refer</button>
+                <button class="patient-action-btn" onclick="openMDPatientInspector(${p.id}, '${name}')">📋 History</button>
+                <button class="patient-action-btn" onclick="openUploadReport(${p.id})">📤 Upload</button>
+                <button class="patient-action-btn" onclick="openReports(${p.id})">📁 Reports</button>
+            </div>
+        </div>`;
+    }).join('');
 }
 
 function prepareConsultation(patientId, patientName) {
@@ -671,28 +757,18 @@ async function sendReferral() {
 // ========================
 // PATIENT DASHBOARD
 // ========================
+let allHistoryData = [];
+
 async function loadPatientDashboard() {
-    const list = document.getElementById('patient-timeline');
     try {
         const res = await fetch(`${API_BASE}/patient/${currentUser.userId}/history`);
-        const data = await res.json();
-        list.innerHTML = '';
-        if (data.length === 0) { list.innerHTML = '<p class="text-muted" style="padding:20px;">No medical records found.</p>'; }
-        else {
-            data.forEach(item => {
-                list.innerHTML += `<div class="timeline-item">
-                    <div class="timeline-date">${new Date(item.date).toLocaleDateString()}</div>
-                    <div class="timeline-content">
-                        <h4>Dr. ${item.doctorName}</h4>
-                        <p><strong>Diagnosis:</strong> ${item.notes}</p>
-                        ${item.prescription ? `<p style="color:var(--accent-2);"><strong>Rx:</strong> ${item.prescription}</p>` : ''}
-                        ${item.referralInfo ? `<p style="font-size:0.8rem;color:var(--text-muted);">🔁 ${item.referralInfo}</p>` : ''}
-                        ${item.reportsUrl ? `<a href="${item.reportsUrl}" target="_blank" style="color:var(--accent-1);">📎 View Report</a>` : ''}
-                    </div>
-                </div>`;
-            });
-        }
-    } catch(e) { list.innerHTML = '<p class="text-danger">Failed to load.</p>'; }
+        allHistoryData = await res.json();
+        allHistoryData.sort((a, b) => new Date(b.date) - new Date(a.date));
+        renderHistoryTable(allHistoryData);
+    } catch(e) {
+        document.getElementById('history-table-body').innerHTML =
+            '<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--danger);">Failed to load history.</td></tr>';
+    }
 
     const aptContainer = document.getElementById('patient-appointments');
     try {
@@ -710,10 +786,7 @@ async function loadPatientDashboard() {
                     : '';
                 const icon = tk.type === 'VIDEO' ? '📹' : '💬';
                 aptContainer.innerHTML += `<div class="card" style="display:flex;justify-content:space-between;align-items:center;border-left:4px solid var(--success);">
-                    <div>
-                        <h4 style="margin:0;">${icon} Meeting with MD (${tk.type}) — Approved</h4>
-                        ${schedInfo}
-                    </div>
+                    <div><h4 style="margin:0;">${icon} Meeting with MD (${tk.type}) — Approved</h4>${schedInfo}</div>
                     <div>${btnHtml}</div>
                 </div>`;
             } else if (tk.status === 'REQUESTED') {
@@ -724,19 +797,224 @@ async function loadPatientDashboard() {
                 </div>`;
             }
         });
-        const reqBtn = document.getElementById('patient-request-token-btn');
-        if (blockNewRequests) {
-            reqBtn.disabled = true;
-            reqBtn.innerText = 'Request MD Token (Pending)';
-            reqBtn.classList.add('outline');
+        if (!hasActives) {
+            // Show "No active appointments" with Request MD Token button inline
+            aptContainer.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">
+                <p class="text-muted">No active appointments.</p>
+                <button id="patient-request-token-btn" class="submit-btn" style="width:auto;padding:9px 18px;" onclick="openModal('token-modal')">💬 Request MD Token</button>
+            </div>`;
         } else {
-            reqBtn.disabled = false;
-            reqBtn.innerText = '💬 Request MD Token';
-            reqBtn.classList.remove('outline');
+            // Add token button below active cards if not blocked
+            const reqBtn = document.getElementById('patient-request-token-btn');
+            if (reqBtn) {
+                if (blockNewRequests) {
+                    reqBtn.disabled = true; reqBtn.innerText = 'Request MD Token (Pending)'; reqBtn.classList.add('outline');
+                } else {
+                    reqBtn.disabled = false; reqBtn.innerText = '💬 Request MD Token'; reqBtn.classList.remove('outline');
+                }
+            }
         }
-        if (!hasActives) aptContainer.innerHTML = '<p class="text-muted" style="padding:20px;">No active appointments.</p>';
     } catch(e) {}
 }
+
+function renderHistoryTable(data) {
+    const tbody = document.getElementById('history-table-body');
+    if (!data.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="padding:28px;text-align:center;color:var(--text-muted);font-size:0.95rem;">No records found.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = data.map((item, i) => {
+        const date = new Date(item.date).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+        const diagnosis = item.notes || '—';
+        const rx = item.prescription || '—';
+        const status = item.referralInfo ? '🔁 Referred' : '✅ Completed';
+        const rowBg = i % 2 === 0 ? '#ffffff' : '#f8fafc';
+        return `<tr style="background:${rowBg};transition:background 0.15s;" onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='${rowBg}'">
+            <td style="padding:12px 14px;font-size:0.85rem;white-space:nowrap;color:var(--text-muted);border-bottom:1px solid var(--border);">${date}</td>
+            <td style="padding:12px 14px;font-size:0.85rem;font-weight:600;border-bottom:1px solid var(--border);">Dr. ${item.doctorName}</td>
+            <td style="padding:12px 14px;font-size:0.85rem;max-width:220px;word-wrap:break-word;border-bottom:1px solid var(--border);">${diagnosis}</td>
+            <td style="padding:12px 14px;font-size:0.85rem;max-width:180px;word-wrap:break-word;color:#0891b2;border-bottom:1px solid var(--border);">${rx}</td>
+            <td style="padding:12px 14px;font-size:0.82rem;border-bottom:1px solid var(--border);">${status}</td>
+        </tr>`;
+    }).join('');
+}
+
+function applyHistoryFilters() {
+    const doctor    = (document.getElementById('filter-doctor')?.value || '').toLowerCase();
+    const diagnosis = (document.getElementById('filter-diagnosis')?.value || '').toLowerCase();
+    const from      = document.getElementById('filter-from')?.value;
+    const sort      = document.getElementById('filter-sort')?.value || 'latest';
+
+    let filtered = allHistoryData.filter(item => {
+        const matchDoctor    = !doctor    || item.doctorName.toLowerCase().includes(doctor);
+        const matchDiagnosis = !diagnosis || (item.notes || '').toLowerCase().includes(diagnosis);
+        const itemDate = new Date(item.date);
+        const matchFrom = !from || itemDate >= new Date(from);
+        return matchDoctor && matchDiagnosis && matchFrom;
+    });
+
+    if (sort === 'latest')       filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+    else if (sort === 'oldest')  filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
+    else if (sort === 'doctor')  filtered.sort((a, b) => a.doctorName.localeCompare(b.doctorName));
+
+    renderHistoryTable(filtered);
+}
+
+function clearHistoryFilters() {
+    ['filter-doctor','filter-diagnosis','filter-from'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = '';
+    });
+    const sort = document.getElementById('filter-sort');
+    if (sort) sort.value = 'latest';
+    renderHistoryTable(allHistoryData);
+}
+
+function exportHistoryPDF() {
+    if (!allHistoryData.length) return alert('No history to export.');
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'landscape' });
+
+    doc.setFontSize(16); doc.setTextColor(59, 130, 246);
+    doc.text('Tele Patient System', 14, 16);
+    doc.setFontSize(11); doc.setTextColor(15, 23, 42);
+    doc.text('Patient: ' + (currentUser?.fullName || 'N/A'), 14, 24);
+    doc.setFontSize(9); doc.setTextColor(100, 116, 139);
+    doc.text('Report Generated: ' + new Date().toLocaleString(), 14, 30);
+
+    const doctor    = (document.getElementById('filter-doctor')?.value || '').toLowerCase();
+    const diagnosis = (document.getElementById('filter-diagnosis')?.value || '').toLowerCase();
+    const from      = document.getElementById('filter-from')?.value;
+    const sort      = document.getElementById('filter-sort')?.value || 'latest';
+
+    let data = allHistoryData.filter(item => {
+        const matchDoctor    = !doctor    || item.doctorName.toLowerCase().includes(doctor);
+        const matchDiagnosis = !diagnosis || (item.notes || '').toLowerCase().includes(diagnosis);
+        const matchFrom = !from || new Date(item.date) >= new Date(from);
+        return matchDoctor && matchDiagnosis && matchFrom;
+    });
+    if (sort === 'latest')      data.sort((a, b) => new Date(b.date) - new Date(a.date));
+    else if (sort === 'oldest') data.sort((a, b) => new Date(a.date) - new Date(b.date));
+    else if (sort === 'doctor') data.sort((a, b) => a.doctorName.localeCompare(b.doctorName));
+
+    const rows = data.map(item => [
+        new Date(item.date).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' }),
+        'Dr. ' + item.doctorName,
+        item.notes || '—',
+        item.prescription || '—',
+        item.referralInfo ? 'Referred' : 'Completed'
+    ]);
+
+    doc.autoTable({
+        startY: 36,
+        head: [['Date', 'Doctor', 'Diagnosis', 'Prescription (Rx)', 'Status']],
+        body: rows,
+        styles: { fontSize: 9, cellPadding: 5, overflow: 'linebreak' },
+        headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        columnStyles: {
+            0: { cellWidth: 30 },
+            1: { cellWidth: 45 },
+            2: { cellWidth: 80 },
+            3: { cellWidth: 70 },
+            4: { cellWidth: 32 }
+        },
+        margin: { left: 14, right: 14 }
+    });
+
+    doc.save(`medical_history_${(currentUser?.fullName || 'patient').replace(/\s/g,'_')}.pdf`);
+}
+
+// ========================
+// EMERGENCY CALL
+// ========================
+async function triggerEmergencyCall(level) {
+    closeModal('emergency-modal');
+    const fab = document.getElementById('emergency-fab').querySelector('button');
+    fab.disabled = true;
+    fab.innerText = '⏳';
+    try {
+        const res = await fetch(`${API_BASE}/patient/${currentUser.userId}/emergency?level=${level}`, { method: 'POST' });
+        const msg = await res.text();
+        // Play alert sound
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.frequency.value = level === 'CRITICAL' ? 880 : level === 'URGENT' ? 660 : 440;
+            osc.start(); gain.gain.setValueAtTime(0.3, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+            osc.stop(ctx.currentTime + 0.8);
+        } catch(e) {}
+        fab.innerText = '✅';
+        fab.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
+        fab.style.animation = 'none';
+        const levelLabels = { CRITICAL: '🔴 Critical', URGENT: '🟡 Urgent', NORMAL: '🟢 Normal' };
+        alert(`${levelLabels[level]} alert sent!\n\n${msg}`);
+        // Reset button back to ready state
+        fab.disabled = false;
+        fab.innerText = '🚨';
+        fab.style.background = 'linear-gradient(135deg,#ef4444,#b91c1c)';
+        fab.style.animation = 'pulse-red 2s infinite';
+    } catch(e) {
+        alert('Failed to send alert. Please call reception directly.');
+        fab.disabled = false;
+        fab.innerText = '🚨';
+        fab.style.background = 'linear-gradient(135deg,#ef4444,#b91c1c)';
+        fab.style.animation = 'pulse-red 2s infinite';
+    }
+}
+
+async function loadMDEmergencyQueue() {
+    const container = document.getElementById('md-emergency-queue');
+    const badge = document.getElementById('emergency-badge');
+    if (!container) return;
+    try {
+        const res = await fetch(`${API_BASE}/md/emergencies`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.length) {
+            container.innerHTML = '<p class="text-muted">No active emergencies.</p>';
+            badge.style.display = 'none';
+            return;
+        }
+        badge.style.display = 'inline-block';
+        // Play beep for new emergencies
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.frequency.value = 880;
+            osc.start(); gain.gain.setValueAtTime(0.2, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+            osc.stop(ctx.currentTime + 0.5);
+        } catch(e) {}
+        const levelColors = { CRITICAL: '#ef4444', URGENT: '#f59e0b', NORMAL: '#22c55e' };
+        const levelLabels = { CRITICAL: '🔴 CRITICAL', URGENT: '🟡 URGENT', NORMAL: '🟢 NORMAL' };
+        container.innerHTML = data.map(e => `
+            <div class="emergency-card" style="border-left:4px solid ${levelColors[e.level] || '#ef4444'};">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <span style="font-weight:700;color:${levelColors[e.level] || '#ef4444'};">${levelLabels[e.level] || '🔴 CRITICAL'}</span>
+                        <span style="margin-left:10px;font-weight:600;">${e.patientName}</span>
+                        <span class="text-muted" style="font-size:0.8rem;margin-left:8px;">${new Date(e.alertTime).toLocaleTimeString()}</span>
+                    </div>
+                    <button onclick="acknowledgeEmergency(${e.id})" style="padding:6px 14px;border-radius:8px;border:1px solid #22c55e;background:rgba(34,197,94,0.15);color:#22c55e;font-weight:600;font-size:0.82rem;cursor:pointer;">
+                        ✓ Acknowledge
+                    </button>
+                </div>
+            </div>`).join('');
+    } catch(e) {}
+}
+
+async function acknowledgeEmergency(id) {
+    try {
+        await fetch(`${API_BASE}/md/emergencies/${id}/acknowledge`, { method: 'PUT' });
+        loadMDEmergencyQueue();
+    } catch(e) {}
+}
+
 
 async function requestToken() {
     const type = document.getElementById('token-type').value;
@@ -893,6 +1171,165 @@ async function addFinancialRecord() {
 }
 
 // ========================
+// MEDICAL REPORTS
+// ========================
+let activeReportForChat = null;
+
+async function openReports(patientId) {
+    openModal('reports-modal');
+    const container = document.getElementById('reports-list');
+    container.innerHTML = '<p class="text-muted">Loading...</p>';
+    try {
+        const res = await fetch(`${API_BASE}/reports/${patientId}`);
+        const data = await res.json();
+        if (!data.length) {
+            container.innerHTML = '<p class="text-muted" style="padding:10px;">No reports found.</p>';
+            return;
+        }
+        const typeIcon = { PDF: '📄', IMAGE: '🖼', TEXT: '📝' };
+        container.innerHTML = data.map(r => `
+            <div class="card" style="margin-bottom:12px;border-left:4px solid var(--primary);">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
+                    <div>
+                        <div style="font-weight:700;font-size:1rem;">${typeIcon[r.reportType] || '📄'} ${r.reportName}</div>
+                        <div class="text-muted" style="font-size:0.8rem;margin-top:4px;">
+                            Dr. ${r.doctorName} &nbsp;·&nbsp; ${new Date(r.uploadedAt).toLocaleDateString()}
+                            &nbsp;·&nbsp; <span style="background:var(--primary-light);color:var(--primary);padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:600;">${r.reportType}</span>
+                        </div>
+                        ${r.notes ? `<div style="font-size:0.82rem;color:var(--text-muted);margin-top:4px;">${r.notes}</div>` : ''}
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <button class="submit-btn outline" style="width:auto;padding:6px 12px;font-size:0.82rem;" onclick="viewReport(${JSON.stringify(r).replace(/"/g,'&quot;')})">👁 View</button>
+                        <a href="${r.fileUrl}" target="_blank" class="submit-btn outline" style="width:auto;padding:6px 12px;font-size:0.82rem;text-decoration:none;">⬇ Download</a>
+                    </div>
+                </div>
+            </div>`).join('');
+    } catch(e) {
+        container.innerHTML = '<p style="color:var(--danger);">Failed to load reports.</p>';
+    }
+}
+
+function viewReport(report) {
+    activeReportForChat = report;
+    document.getElementById('report-viewer-title').innerText =
+        (report.reportType === 'PDF' ? '📄' : report.reportType === 'IMAGE' ? '🖼' : '📝') + ' ' + report.reportName;
+
+    // Fix download button
+    const dlBtn = document.getElementById('report-download-btn');
+    if (!report.fileUrl) {
+        dlBtn.style.display = 'none';
+    } else {
+        dlBtn.style.display = 'flex';
+        dlBtn.onclick = () => downloadReport(report);
+        dlBtn.removeAttribute('href');
+    }
+
+    const content = document.getElementById('report-viewer-content');
+    if (report.reportType === 'IMAGE') {
+        content.innerHTML = `<img src="${report.fileUrl}" style="width:100%;border-radius:10px;max-height:500px;object-fit:contain;"
+            onerror="this.outerHTML='<p style=color:var(--danger)>Image could not be loaded. <a href=${report.fileUrl} target=_blank>Open link</a></p>'">`;
+    } else if (report.reportType === 'PDF') {
+        content.innerHTML = `<iframe src="${report.fileUrl}" style="width:100%;height:480px;border-radius:10px;border:1px solid var(--border);"></iframe>
+            <p style="margin-top:8px;font-size:0.82rem;color:var(--text-muted);">If PDF doesn't load, <a href="${report.fileUrl}" target="_blank" style="color:var(--primary);">click here to open</a>.</p>`;
+    } else {
+        content.innerHTML = `<div style="background:var(--bg-secondary);padding:16px;border-radius:10px;white-space:pre-wrap;font-size:0.9rem;line-height:1.6;">${report.notes || report.fileUrl}</div>`;
+    }
+
+    const chatBtn = document.getElementById('report-chat-btn');
+    chatBtn.style.display = activeChatTokenId ? 'flex' : 'none';
+    openModal('report-viewer-modal');
+}
+
+function downloadReport(report) {
+    if (!report.fileUrl) return alert('File not available.');
+    const url = report.fileUrl;
+    const name = report.reportName || 'report';
+
+    // base64 data URL — convert to blob and download
+    if (url.startsWith('data:')) {
+        const [meta, base64] = url.split(',');
+        const mime = meta.match(/:(.*?);/)[1];
+        const binary = atob(base64);
+        const arr = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
+        const blob = new Blob([arr], { type: mime });
+        const ext = mime.includes('pdf') ? '.pdf' : mime.includes('png') ? '.png' : mime.includes('jpeg') ? '.jpg' : '';
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = name + ext;
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+    } else {
+        // Regular URL — direct download
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = name;
+        a.target = '_blank';
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a);
+    }
+}
+
+async function sendReportToChat() {
+    if (!activeReportForChat || !activeChatTokenId) return;
+    try {
+        const res = await fetch(`${API_BASE}/reports/send-to-chat`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                reportId: activeReportForChat.id,
+                tokenId: activeChatTokenId,
+                senderId: currentUser.userId
+            })
+        });
+        if (!res.ok) throw new Error('Failed');
+        alert('✅ Report shared in chat!');
+        closeModal('report-viewer-modal');
+        pollChatMessages();
+    } catch(e) { alert('Failed to send: ' + e.message); }
+}
+
+function openUploadReport(patientId) {
+    document.getElementById('upload-report-patient-id').value = patientId;
+    document.getElementById('upload-report-status').innerText = '';
+    openModal('upload-report-modal');
+}
+
+function handleReportFileSelect() {
+    const file = document.getElementById('upload-report-file').files[0];
+    const status = document.getElementById('upload-report-status');
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        document.getElementById('upload-report-url').value = e.target.result;
+        // Auto-detect type
+        if (file.type.includes('pdf')) document.getElementById('upload-report-type').value = 'PDF';
+        else if (file.type.includes('image')) document.getElementById('upload-report-type').value = 'IMAGE';
+        status.innerText = '✅ File loaded: ' + file.name;
+    };
+    reader.readAsDataURL(file);
+}
+
+async function submitReportUpload() {
+    const patientId = document.getElementById('upload-report-patient-id').value;
+    const name  = document.getElementById('upload-report-name').value;
+    const type  = document.getElementById('upload-report-type').value;
+    const url   = document.getElementById('upload-report-url').value;
+    const notes = document.getElementById('upload-report-notes').value;
+    if (!name) return alert('Enter a report name.');
+    if (!url)  return alert('Select a file or enter a URL.');
+    try {
+        await fetch(`${API_BASE}/reports/upload`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ patientId: parseInt(patientId), doctorId: currentUser.userId, reportName: name, reportType: type, fileUrl: url, notes })
+        });
+        alert('✅ Report uploaded successfully!');
+        closeModal('upload-report-modal');
+        loadDoctorDashboard();
+    } catch(e) { alert('Failed: ' + e.message); }
+}
+
+// ========================
 // CHATBOT
 // ========================
 const chatbotKB = {
@@ -911,7 +1348,8 @@ const chatbotKB = {
     launchpad: 'LaunchPad: Doctors and patients submit ideas → fill title, description, domain, contact → submit. Main Doctor views all submissions.',
     social: 'Social Feed: Only Main Doctor can post (text, YouTube links, images). Everyone can view by clicking Social Feed in navbar.',
     password: 'Forgot password: Click Forgot Password on login → enter email → OTP appears in Spring Boot console → enter OTP and new password.',
-    default: 'I can help with: revenue/expenses, chat/video sessions, token requests, referrals, patient assignment, roles, reports, launchpad, social feed, passwords. What would you like to know?'
+    emergency: '🚨 Emergency Contacts:\n\n🔴 Hospital Emergency: <a href="tel:108" style="color:#ef4444;font-weight:700;">108</a>\n🚑 Ambulance: <a href="tel:102" style="color:#ef4444;font-weight:700;">102</a>\n🚒 Fire: <a href="tel:101" style="color:#f59e0b;font-weight:700;">101</a>\n👮 Police: <a href="tel:100" style="color:#3b82f6;font-weight:700;">100</a>\n📞 Hospital Counter: <a href="tel:+911234567890" style="color:#22c55e;font-weight:700;">+91 12345 67890</a>\n\nOr use the 🚨 red button (bottom-right) to instantly alert hospital staff.',
+    default: 'I can help with: revenue/expenses, chat/video sessions, token requests, referrals, patient assignment, roles, reports, launchpad, social feed, passwords, emergency numbers. What would you like to know?'
 };
 
 function toggleChatbot() {
@@ -963,6 +1401,7 @@ function sendChatbotMessage() {
     else if (lower.includes('launchpad') || lower.includes('idea')) response = chatbotKB.launchpad;
     else if (lower.includes('social') || lower.includes('post') || lower.includes('feed')) response = chatbotKB.social;
     else if (lower.includes('password') || lower.includes('otp') || lower.includes('forgot')) response = chatbotKB.password;
+    else if (lower.includes('emergency') || lower.includes('ambulance') || lower.includes('helpline') || lower.includes('number') || lower.includes('contact') || lower.includes('call') && lower.includes('hospital')) response = chatbotKB.emergency;
     setTimeout(() => addBotMsg(response), 400);
 }
 
