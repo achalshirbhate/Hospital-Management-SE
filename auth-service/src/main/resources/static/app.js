@@ -3,6 +3,23 @@ let currentUser = null;
 let activeChatTokenId = null;
 let chatPollInterval = null;
 
+// ── HAMBURGER MENU ──
+function toggleNavMenu() {
+    const links = document.getElementById('nav-links');
+    const btn   = document.getElementById('nav-hamburger');
+    if (!links || !btn) return;
+    const isOpen = links.classList.toggle('nav-open');
+    btn.classList.toggle('open', isOpen);
+}
+document.addEventListener('click', (e) => {
+    const links = document.getElementById('nav-links');
+    const btn   = document.getElementById('nav-hamburger');
+    if (links && btn && !btn.contains(e.target) && !links.contains(e.target)) {
+        links.classList.remove('nav-open');
+        btn.classList.remove('open');
+    }
+});
+
 // ========================
 // AUTH TOGGLE
 // ========================

@@ -106,7 +106,10 @@
         <!-- Navbar -->
         <nav class="glass-panel navbar">
             <h2 id="nav-logo">Tele Patient System</h2>
-            <div class="nav-links">
+            <button class="nav-hamburger" id="nav-hamburger" onclick="toggleNavMenu()" aria-label="Menu">
+                <span></span><span></span><span></span>
+            </button>
+            <div class="nav-links" id="nav-links">
                 <button class="nav-btn" onclick="handleLaunchpadClick()">&#128640; LaunchPad</button>
                 <button class="nav-btn" onclick="openModal('social-modal')">&#128241; Social Feed</button>
                 <div class="user-badge" id="user-badge">User Name</div>
