@@ -62,13 +62,20 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void generateResetOtp(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("Email not found"));
+                .orElseThrow(() -> new IllegalArgumentException("No account found with this email address."));
         String otp = String.format("%06d", new java.util.Random().nextInt(999999));
         user.setResetOtp(otp);
         user.setOtpExpiry(LocalDateTime.now().plusMinutes(5));
         userRepository.save(user);
-        // Send OTP via email
-        emailService.sendOtpEmail(email, otp);
+        // Try sending email; silently fallback to console if SMTP not configured
+        try {
+            emailService.sendOtpEmail(email, otp);
+        } catch (Exception e) {
+            System.out.println("\n=========================================================");
+            System.out.println("OTP FOR: " + email + "  →  " + otp);
+            System.out.println("=========================================================\n");
+        }
+        // Always return success — OTP is saved regardless of email delivery
     }
 
     @Override

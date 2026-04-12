@@ -69,21 +69,30 @@ document.getElementById('forgot-form').addEventListener('submit', async (e) => {
     const email = document.getElementById('forgot-email').value;
     const otpGroup = document.getElementById('otp-group');
     if (otpGroup.classList.contains('hidden')) {
+        btn.disabled = true; btn.innerText = 'Sending...';
         try {
             const res = await fetch(`${API_BASE}/auth/forgot-password?email=${encodeURIComponent(email)}`, { method: 'POST' });
-            if (!res.ok) throw new Error('Email not found or failed to send.');
-            alert("✅ OTP sent to your registered email: " + email + "\nPlease check your inbox (and spam folder).");
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || 'Email not found.');
+            }
+            // Always show OTP input — email sent or check console
             otpGroup.classList.remove('hidden');
             document.getElementById('forgot-email').readOnly = true;
             btn.innerText = 'Confirm New Password';
-        } catch(err) { alert('Failed: ' + err.message); }
+            btn.disabled = false;
+            alert("✅ OTP sent! Check your email inbox.\n(If email not received, check the server console for OTP)");
+        } catch(err) {
+            btn.disabled = false; btn.innerText = 'Send OTP via Email';
+            alert('Failed: ' + err.message);
+        }
     } else {
         const otp = document.getElementById('forgot-otp').value;
         const newPwd = document.getElementById('forgot-new-pwd').value;
         try {
             const res = await fetch(`${API_BASE}/auth/reset-password-otp?email=${encodeURIComponent(email)}&otp=${otp}&newPassword=${newPwd}`, { method: 'POST' });
-            if (!res.ok) throw new Error('Invalid/Expired OTP');
-            alert('Password updated! Please login.');
+            if (!res.ok) throw new Error('Invalid or expired OTP. Please try again.');
+            alert('✅ Password updated successfully! Please login.');
             cancelForgot();
         } catch(err) { alert(err.message); }
     }
@@ -1454,8 +1463,13 @@ async function submitAddPatient() {
               body: JSON.stringify({ fullName: name, email: email, password: 'temp@123' }) }
         );
         if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.email || err.fullName || 'Failed to add patient');
+            let errMsg = 'Failed to add patient';
+            try {
+                const text = await res.text();
+                const json = JSON.parse(text);
+                errMsg = json.email || json.fullName || json.message || json.error || text || errMsg;
+            } catch(e) {}
+            throw new Error(errMsg);
         }
         alert(`✅ Patient "${name}" added successfully! Default password: temp@123`);
         closeModal('add-patient-doctor-modal');
