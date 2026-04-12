@@ -425,30 +425,46 @@ async function openMDDoctorView(docId, docName) {
 
 async function openMDPatientInspector(patId, patName) {
     closeModal('md-doctor-inspect-modal');
-    document.getElementById('inspect-pat-name').innerText = patName + ' (Clinical Timeline)';
-    document.getElementById('inspect-pat-timeline').innerHTML = '<p class="text-muted">Loading...</p>';
+    document.getElementById('inspect-pat-name').innerText = patName + ' — Clinical Timeline';
+    const container = document.getElementById('inspect-pat-timeline');
+    container.innerHTML = '<p class="text-muted" style="padding:10px;">Loading...</p>';
     openModal('md-patient-inspect-modal');
     try {
         const res = await fetch(`${API_BASE}/md/patients/${patId}/history`);
         const hist = await res.json();
-        const container = document.getElementById('inspect-pat-timeline');
-        if (!hist.length) { container.innerHTML = '<p class="text-muted">No history found.</p>'; return; }
-        let html = '';
-        hist.forEach(h => {
-            const attachHtml = h.reportsUrl ? `<a href="${h.reportsUrl}" target="_blank" style="color:var(--accent-1);font-size:0.85rem;">📎 View Report</a>` : '';
-            const rxHtml = h.prescription ? `<p style="margin:5px 0;"><strong style="color:var(--accent-2);">Rx:</strong> ${h.prescription}</p>` : '';
-            const refHtml = h.referralInfo ? `<p style="margin:5px 0;font-size:0.8rem;color:var(--text-muted);">🔁 ${h.referralInfo}</p>` : '';
-            html += `<div class="timeline-item">
-                <div class="timeline-date">${new Date(h.date).toLocaleDateString()}</div>
-                <div class="timeline-content">
-                    <h4>Dr. ${h.doctorName}</h4>
-                    <p style="margin:5px 0;"><strong>Diagnosis:</strong> ${h.notes}</p>
-                    ${rxHtml}${refHtml}${attachHtml}
+        if (!hist.length) {
+            container.innerHTML = '<p class="text-muted" style="padding:16px;text-align:center;">No medical history available.</p>';
+            return;
+        }
+        container.innerHTML = hist.map((h, i) => {
+            const date = new Date(h.date).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+            const rxHtml = h.prescription
+                ? `<div style="margin-top:8px;padding:8px 12px;background:#f0fdf4;border-radius:8px;border-left:3px solid var(--green);">
+                    <span style="font-size:0.75rem;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:0.5px;">💊 Prescription</span>
+                    <p style="margin:4px 0 0;font-size:0.88rem;color:var(--text-main);">${h.prescription}</p>
+                   </div>` : '';
+            const refHtml = h.referralInfo
+                ? `<p style="margin-top:6px;font-size:0.8rem;color:var(--text-muted);">🔁 ${h.referralInfo}</p>` : '';
+            const reportBtn = h.reportsUrl
+                ? `<button onclick="viewHistoryReport(${JSON.stringify(h).replace(/"/g,'&quot;')})"
+                    style="margin-top:10px;background:var(--primary-light);border:1.5px solid var(--primary);color:var(--primary);padding:6px 14px;border-radius:8px;font-size:0.82rem;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+                    📎 View Report
+                   </button>` : '';
+            return `<div style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:12px;box-shadow:var(--shadow-sm);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <span style="font-size:0.78rem;font-weight:700;color:var(--primary);background:var(--primary-light);padding:3px 10px;border-radius:20px;">📅 ${date}</span>
+                    <span style="font-size:0.8rem;font-weight:600;color:var(--text-muted);">Dr. ${h.doctorName}</span>
                 </div>
+                <div style="margin-bottom:4px;">
+                    <span style="font-size:0.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">📋 Diagnosis</span>
+                    <p style="margin:4px 0 0;font-size:0.9rem;color:var(--text-main);line-height:1.5;">${h.notes || '—'}</p>
+                </div>
+                ${rxHtml}${refHtml}${reportBtn}
             </div>`;
-        });
-        container.innerHTML = html;
-    } catch(e) { document.getElementById('inspect-pat-timeline').innerHTML = '<p class="error-msg">Failed.</p>'; }
+        }).join('');
+    } catch(e) {
+        container.innerHTML = '<p style="color:var(--danger);padding:16px;">Failed to load history.</p>';
+    }
 }
 
 async function executeDirectAssignment() {
@@ -865,7 +881,7 @@ async function loadPatientDashboard() {
 function renderHistoryTable(data) {
     const tbody = document.getElementById('history-table-body');
     if (!data.length) {
-        tbody.innerHTML = '<tr><td colspan="5" style="padding:28px;text-align:center;color:var(--text-muted);font-size:0.95rem;">No records found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="padding:32px;text-align:center;color:var(--text-muted);font-size:0.92rem;">No medical history available.</td></tr>';
         return;
     }
     tbody.innerHTML = data.map((item, i) => {
@@ -873,13 +889,19 @@ function renderHistoryTable(data) {
         const diagnosis = item.notes || '—';
         const rx = item.prescription || '—';
         const status = item.referralInfo ? '🔁 Referred' : '✅ Completed';
+        const reportBtn = item.reportsUrl
+            ? `<button onclick="viewHistoryReport(${JSON.stringify(item).replace(/"/g,'&quot;')})"
+                style="background:var(--primary-light);border:1.5px solid var(--primary);color:var(--primary);padding:4px 10px;border-radius:7px;font-size:0.78rem;font-weight:600;cursor:pointer;white-space:nowrap;">
+                📎 View
+               </button>`
+            : '';
         const rowBg = i % 2 === 0 ? '#ffffff' : '#f8fafc';
         return `<tr style="background:${rowBg};transition:background 0.15s;" onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='${rowBg}'">
             <td style="padding:12px 14px;font-size:0.85rem;white-space:nowrap;color:var(--text-muted);border-bottom:1px solid var(--border);">${date}</td>
             <td style="padding:12px 14px;font-size:0.85rem;font-weight:600;border-bottom:1px solid var(--border);">Dr. ${item.doctorName}</td>
             <td style="padding:12px 14px;font-size:0.85rem;max-width:220px;word-wrap:break-word;border-bottom:1px solid var(--border);">${diagnosis}</td>
             <td style="padding:12px 14px;font-size:0.85rem;max-width:180px;word-wrap:break-word;color:#0891b2;border-bottom:1px solid var(--border);">${rx}</td>
-            <td style="padding:12px 14px;font-size:0.82rem;border-bottom:1px solid var(--border);">${status}</td>
+            <td style="padding:12px 14px;font-size:0.82rem;border-bottom:1px solid var(--border);">${status} ${reportBtn}</td>
         </tr>`;
     }).join('');
 }
@@ -1282,7 +1304,6 @@ async function openReports(patientId) {
                     </div>
                     <div style="display:flex;gap:8px;flex-wrap:wrap;">
                         <button class="submit-btn outline" style="width:auto;padding:6px 12px;font-size:0.82rem;" onclick="viewReport(${JSON.stringify(r).replace(/"/g,'&quot;')})">👁 View</button>
-                        <button class="submit-btn outline" style="width:auto;padding:6px 12px;font-size:0.82rem;" onclick="downloadMedicalReport(${JSON.stringify(r).replace(/"/g,'&quot;')})">⬇ Download</button>
                     </div>
                 </div>
             </div>`).join('');
@@ -1291,35 +1312,85 @@ async function openReports(patientId) {
     }
 }
 
+// Shared report viewer — used by both uploaded reports and history entries
+function openReportViewer({ title, meta, diagnosis, prescription, referralInfo, fileUrl, fileType, reportObj }) {
+    document.getElementById('report-viewer-title').innerText = title || 'Report';
+
+    // Meta row (doctor, date, type)
+    const metaEl = document.getElementById('report-viewer-meta');
+    metaEl.innerHTML = meta || '';
+
+    // Clinical info (diagnosis / rx)
+    const clinicalEl = document.getElementById('report-viewer-clinical');
+    if (diagnosis || prescription) {
+        clinicalEl.style.display = 'block';
+        clinicalEl.innerHTML = `
+            ${diagnosis ? `<div style="margin-bottom:10px;padding:12px;background:var(--bg-secondary);border-radius:10px;border-left:3px solid var(--primary);">
+                <div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">📋 Diagnosis</div>
+                <div style="font-size:0.9rem;color:var(--text-main);">${diagnosis}</div>
+            </div>` : ''}
+            ${prescription ? `<div style="padding:12px;background:#f0fdf4;border-radius:10px;border-left:3px solid var(--green);">
+                <div style="font-size:0.72rem;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">💊 Prescription</div>
+                <div style="font-size:0.9rem;color:var(--text-main);">${prescription}</div>
+            </div>` : ''}
+            ${referralInfo ? `<p style="margin-top:8px;font-size:0.82rem;color:var(--text-muted);">🔁 ${referralInfo}</p>` : ''}`;
+    } else {
+        clinicalEl.style.display = 'none';
+        clinicalEl.innerHTML = '';
+    }
+
+    // File preview
+    const content = document.getElementById('report-viewer-content');
+    if (!fileUrl) {
+        content.innerHTML = '<p class="text-muted" style="padding:16px;text-align:center;">No file attached to this record.</p>';
+    } else if (fileType === 'IMAGE' || fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) || fileUrl.startsWith('data:image')) {
+        content.innerHTML = `<img src="${fileUrl}" style="width:100%;border-radius:10px;max-height:480px;object-fit:contain;"
+            onerror="this.outerHTML='<p style=color:var(--danger);padding:12px>Image could not be loaded.</p>'">`;
+    } else if (fileType === 'PDF' || fileUrl.includes('.pdf') || fileUrl.startsWith('data:application/pdf')) {
+        content.innerHTML = `<iframe src="${fileUrl}" style="width:100%;height:460px;border-radius:10px;border:1px solid var(--border);"></iframe>
+            <p style="margin-top:8px;font-size:0.8rem;color:var(--text-muted);">PDF not loading? <a href="${fileUrl}" target="_blank" style="color:var(--primary);">Open in new tab</a></p>`;
+    } else {
+        content.innerHTML = `<div style="background:var(--bg-secondary);padding:16px;border-radius:10px;white-space:pre-wrap;font-size:0.9rem;line-height:1.6;">${fileUrl}</div>`;
+    }
+
+    // Chat button — only when active chat session
+    const chatBtn = document.getElementById('report-chat-btn');
+    if (reportObj && activeChatTokenId) {
+        activeReportForChat = reportObj;
+        chatBtn.style.display = 'flex';
+    } else {
+        chatBtn.style.display = 'none';
+    }
+
+    openModal('report-viewer-modal');
+}
+
+// Called from uploaded reports list
 function viewReport(report) {
     activeReportForChat = report;
-    document.getElementById('report-viewer-title').innerText =
-        (report.reportType === 'PDF' ? '📄' : report.reportType === 'IMAGE' ? '🖼' : '📝') + ' ' + report.reportName;
+    const typeIcon = report.reportType === 'PDF' ? '📄' : report.reportType === 'IMAGE' ? '🖼' : '📝';
+    openReportViewer({
+        title: `${typeIcon} ${report.reportName}`,
+        meta: `<span>👨‍⚕️ Dr. ${report.doctorName}</span><span>📅 ${new Date(report.uploadedAt).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</span><span style="background:var(--primary-light);color:var(--primary);padding:2px 8px;border-radius:8px;font-size:0.78rem;font-weight:600;">${report.reportType}</span>`,
+        diagnosis: report.notes || null,
+        fileUrl: report.fileUrl,
+        fileType: report.reportType,
+        reportObj: report
+    });
+}
 
-    // Fix download button
-    const dlBtn = document.getElementById('report-download-btn');
-    if (!report.fileUrl) {
-        dlBtn.style.display = 'none';
-    } else {
-        dlBtn.style.display = 'flex';
-        dlBtn.onclick = () => downloadMedicalReport(report);
-        dlBtn.removeAttribute('href');
-    }
-
-    const content = document.getElementById('report-viewer-content');
-    if (report.reportType === 'IMAGE') {
-        content.innerHTML = `<img src="${report.fileUrl}" style="width:100%;border-radius:10px;max-height:500px;object-fit:contain;"
-            onerror="this.outerHTML='<p style=color:var(--danger)>Image could not be loaded. <a href=${report.fileUrl} target=_blank>Open link</a></p>'">`;
-    } else if (report.reportType === 'PDF') {
-        content.innerHTML = `<iframe src="${report.fileUrl}" style="width:100%;height:480px;border-radius:10px;border:1px solid var(--border);"></iframe>
-            <p style="margin-top:8px;font-size:0.82rem;color:var(--text-muted);">If PDF doesn't load, <a href="${report.fileUrl}" target="_blank" style="color:var(--primary);">click here to open</a>.</p>`;
-    } else {
-        content.innerHTML = `<div style="background:var(--bg-secondary);padding:16px;border-radius:10px;white-space:pre-wrap;font-size:0.9rem;line-height:1.6;">${report.notes || report.fileUrl}</div>`;
-    }
-
-    const chatBtn = document.getElementById('report-chat-btn');
-    chatBtn.style.display = activeChatTokenId ? 'flex' : 'none';
-    openModal('report-viewer-modal');
+// Called from clinical history "📎 View Report"
+function viewHistoryReport(h) {
+    openReportViewer({
+        title: `📋 Clinical Record — Dr. ${h.doctorName}`,
+        meta: `<span>👨‍⚕️ Dr. ${h.doctorName}</span><span>📅 ${new Date(h.date).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</span>`,
+        diagnosis: h.notes || null,
+        prescription: h.prescription || null,
+        referralInfo: h.referralInfo || null,
+        fileUrl: h.reportsUrl || null,
+        fileType: h.reportsUrl?.includes('.pdf') ? 'PDF' : h.reportsUrl?.match(/\.(jpg|jpeg|png)$/i) ? 'IMAGE' : null,
+        reportObj: null
+    });
 }
 
 function downloadReport(report) {

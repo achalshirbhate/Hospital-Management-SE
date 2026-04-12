@@ -589,23 +589,26 @@
                 <h2 style="margin:0;">📋 Medical Reports</h2>
                 <button class="submit-btn outline" style="width:auto;padding:6px 14px;margin:0;" onclick="closeModal('reports-modal')">✕ Close</button>
             </div>
-            <div id="reports-list">
-                <p class="text-muted">Loading reports...</p>
-            </div>
+            <div id="reports-list"><p class="text-muted">Loading reports...</p></div>
         </div>
     </div>
 
-    <!-- REPORT VIEWER MODAL -->
+    <!-- REPORT VIEWER MODAL (reused for both uploaded reports & history) -->
     <div id="report-viewer-modal" class="modal">
         <div class="modal-content glass-panel" style="width:700px;max-width:95vw;max-height:90vh;overflow-y:auto;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-                <h2 id="report-viewer-title" style="margin:0;font-size:1.1rem;">Report</h2>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border);">
+                <h2 id="report-viewer-title" style="margin:0;font-size:1.15rem;"></h2>
                 <button class="submit-btn outline" style="width:auto;padding:6px 14px;margin:0;" onclick="closeModal('report-viewer-modal')">✕ Close</button>
             </div>
-            <div id="report-viewer-content" style="min-height:300px;"></div>
+            <!-- Meta info row -->
+            <div id="report-viewer-meta" style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:16px;font-size:0.85rem;color:var(--text-muted);"></div>
+            <!-- Diagnosis / Rx (for history entries) -->
+            <div id="report-viewer-clinical" style="display:none;margin-bottom:16px;"></div>
+            <!-- File preview -->
+            <div id="report-viewer-content" style="min-height:200px;"></div>
+            <!-- Actions -->
             <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
-                <button id="report-download-btn" class="submit-btn" style="width:auto;padding:10px 20px;" onclick="">⬇ Download</button>
-                <button id="report-chat-btn" class="submit-btn outline" style="width:auto;padding:10px 20px;" onclick="sendReportToChat()">💬 Send in Chat</button>
+                <button id="report-chat-btn" class="submit-btn outline" style="width:auto;padding:10px 20px;display:none;" onclick="sendReportToChat()">💬 Send in Chat</button>
             </div>
         </div>
     </div>
