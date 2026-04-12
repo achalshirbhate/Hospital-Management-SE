@@ -169,6 +169,8 @@ function initApp(userData) {
         document.getElementById('md-dashboard').classList.remove('hidden');
         const fab = document.getElementById('emergency-fab');
         if (fab) fab.style.display = 'none';
+        const bell = document.getElementById('emergency-bell-wrap');
+        if (bell) bell.style.display = 'block';
         loadMDDashboard();
         loadMDQueues();
         loadMDEmergencyQueue();
@@ -1051,6 +1053,8 @@ async function triggerEmergencyCall(level) {
     }
 }
 
+let _lastEmergencyCount = 0;
+
 async function loadMDEmergencyQueue() {
     const container = document.getElementById('md-emergency-queue');
     const badge = document.getElementById('emergency-badge');
@@ -1059,39 +1063,53 @@ async function loadMDEmergencyQueue() {
         const res = await fetch(`${API_BASE}/md/emergencies`);
         if (!res.ok) return;
         const data = await res.json();
+
+        // Update badge
+        if (badge) {
+            badge.style.display = data.length > 0 ? 'flex' : 'none';
+            badge.innerText = data.length > 9 ? '9+' : data.length;
+        }
+
+        // Show toast for NEW alerts
+        if (data.length > _lastEmergencyCount) {
+            const newest = data[0];
+            showEmergencyToast(newest);
+            playBeep(newest.level);
+        }
+        _lastEmergencyCount = data.length;
+
         if (!data.length) {
-            container.innerHTML = '<p class="text-muted">No active emergencies.</p>';
-            badge.style.display = 'none';
+            container.innerHTML = '<p class="text-muted" style="padding:12px;text-align:center;font-size:0.85rem;">No active emergencies.</p>';
             return;
         }
-        badge.style.display = 'inline-block';
-        // Play beep for new emergencies
-        try {
-            const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain); gain.connect(ctx.destination);
-            osc.frequency.value = 880;
-            osc.start(); gain.gain.setValueAtTime(0.2, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
-            osc.stop(ctx.currentTime + 0.5);
-        } catch(e) {}
-        const levelColors = { CRITICAL: '#ef4444', URGENT: '#f59e0b', NORMAL: '#22c55e' };
-        const levelLabels = { CRITICAL: '🔴 CRITICAL', URGENT: '🟡 URGENT', NORMAL: '🟢 NORMAL' };
+
+        const levelColors  = { CRITICAL: '#ef4444', URGENT: '#f59e0b', NORMAL: '#22c55e' };
+        const levelBg      = { CRITICAL: '#fef2f2', URGENT: '#fffbeb', NORMAL: '#f0fdf4' };
+        const levelLabels  = { CRITICAL: '🔴 Critical', URGENT: '🟡 Urgent', NORMAL: '🟢 Normal' };
+
         container.innerHTML = data.map(e => `
-            <div class="emergency-card" style="border-left:4px solid ${levelColors[e.level] || '#ef4444'};">
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <div>
-                        <span style="font-weight:700;color:${levelColors[e.level] || '#ef4444'};">${levelLabels[e.level] || '🔴 CRITICAL'}</span>
-                        <span style="margin-left:10px;font-weight:600;">${e.patientName}</span>
-                        <span class="text-muted" style="font-size:0.8rem;margin-left:8px;">${new Date(e.alertTime).toLocaleTimeString()}</span>
+            <div style="background:${levelBg[e.level] || '#fef2f2'};border:1.5px solid ${levelColors[e.level] || '#ef4444'};border-radius:10px;padding:12px 14px;margin-bottom:8px;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:700;font-size:0.82rem;color:${levelColors[e.level] || '#ef4444'};">${levelLabels[e.level] || '🔴 Critical'}</div>
+                        <div style="font-weight:600;font-size:0.9rem;margin-top:2px;color:#0f172a;">${e.patientName}</div>
+                        <div style="font-size:0.75rem;color:#64748b;margin-top:2px;">${timeAgo(e.alertTime)}</div>
                     </div>
-                    <button onclick="acknowledgeEmergency(${e.id})" style="padding:6px 14px;border-radius:8px;border:1px solid #22c55e;background:rgba(34,197,94,0.15);color:#22c55e;font-weight:600;font-size:0.82rem;cursor:pointer;">
-                        ✓ Acknowledge
+                    <button onclick="acknowledgeEmergency(${e.id})"
+                        style="flex-shrink:0;padding:5px 10px;border-radius:7px;border:1px solid #22c55e;background:white;color:#16a34a;font-weight:700;font-size:0.75rem;cursor:pointer;white-space:nowrap;">
+                        ✓ Ack
                     </button>
                 </div>
             </div>`).join('');
     } catch(e) {}
+}
+
+function toggleEmergencyPanel() {
+    const panel = document.getElementById('emergency-panel');
+    if (!panel) return;
+    const isOpen = panel.style.display === 'block';
+    panel.style.display = isOpen ? 'none' : 'block';
+    if (!isOpen) loadMDEmergencyQueue();
 }
 
 async function acknowledgeEmergency(id) {
@@ -1100,6 +1118,55 @@ async function acknowledgeEmergency(id) {
         loadMDEmergencyQueue();
     } catch(e) {}
 }
+
+async function acknowledgeAllEmergencies() {
+    const container = document.getElementById('md-emergency-queue');
+    if (!container) return;
+    const btns = container.querySelectorAll('button');
+    for (const btn of btns) btn.click();
+}
+
+function showEmergencyToast(alert) {
+    const tc = document.getElementById('emergency-toast-container');
+    if (!tc) return;
+    const levelColors = { CRITICAL: '#ef4444', URGENT: '#f59e0b', NORMAL: '#22c55e' };
+    const levelLabels = { CRITICAL: '🔴 Critical', URGENT: '🟡 Urgent', NORMAL: '🟢 Normal' };
+    const toast = document.createElement('div');
+    toast.style.cssText = `pointer-events:all;background:white;border:1.5px solid ${levelColors[alert.level] || '#ef4444'};border-radius:12px;padding:14px 16px;width:300px;box-shadow:0 8px 24px rgba(0,0,0,0.15);animation:slideInRight 0.3s ease;`;
+    toast.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div>
+                <div style="font-weight:700;font-size:0.8rem;color:${levelColors[alert.level] || '#ef4444'};">${levelLabels[alert.level] || '🔴 Critical'} Emergency</div>
+                <div style="font-weight:600;font-size:0.92rem;margin-top:3px;">${alert.patientName}</div>
+                <div style="font-size:0.75rem;color:#64748b;margin-top:2px;">${timeAgo(alert.alertTime)}</div>
+            </div>
+            <button onclick="this.closest('div[style]').remove()" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:1rem;padding:0 0 0 8px;">✕</button>
+        </div>`;
+    tc.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.4s'; setTimeout(() => toast.remove(), 400); }, 6000);
+}
+
+function playBeep(level) {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = level === 'CRITICAL' ? 880 : level === 'URGENT' ? 660 : 440;
+        osc.start(); gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+        osc.stop(ctx.currentTime + 0.6);
+    } catch(e) {}
+}
+
+// Close emergency panel on outside click
+document.addEventListener('click', (e) => {
+    const wrap = document.getElementById('emergency-bell-wrap');
+    const panel = document.getElementById('emergency-panel');
+    if (wrap && panel && !wrap.contains(e.target) && panel.style.display === 'block') {
+        panel.style.display = 'none';
+    }
+});
 
 
 async function requestToken() {

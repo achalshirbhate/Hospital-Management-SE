@@ -126,6 +126,22 @@
                         <div id="notif-list" style="padding:8px 0;"></div>
                     </div>
                 </div>
+                <!-- Emergency Bell (MD only) -->
+                <div class="notif-wrap" id="emergency-bell-wrap" style="display:none;position:relative;">
+                    <button class="nav-btn" onclick="toggleEmergencyPanel()" style="position:relative;padding:8px 10px;" title="Emergency Alerts">
+                        🚨
+                        <span id="emergency-badge" style="display:none;position:absolute;top:4px;right:4px;background:#ef4444;color:white;font-size:0.6rem;font-weight:700;min-width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;line-height:1;animation:blink 1s infinite;">0</span>
+                    </button>
+                    <div id="emergency-panel" style="display:none;position:absolute;right:0;top:calc(100% + 8px);width:340px;max-height:460px;overflow-y:auto;background:white;border:1px solid #fecaca;border-radius:14px;box-shadow:0 10px 30px rgba(239,68,68,0.15);z-index:2000;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid #fecaca;background:#fef2f2;border-radius:14px 14px 0 0;">
+                            <span style="font-weight:700;font-size:0.95rem;color:#dc2626;">🚨 Emergency Alerts</span>
+                            <button onclick="acknowledgeAllEmergencies()" style="background:none;border:none;color:#dc2626;font-size:0.78rem;font-weight:600;cursor:pointer;">Ack All</button>
+                        </div>
+                        <div id="md-emergency-queue" style="padding:8px;">
+                            <p class="text-muted" style="padding:12px;text-align:center;font-size:0.85rem;">No active emergencies.</p>
+                        </div>
+                    </div>
+                </div>
                 <div class="user-badge" id="user-badge">User Name</div>
                 <button class="nav-btn danger" onclick="logout()">Logout</button>
             </div>
@@ -254,15 +270,6 @@
                 <h3>Pending Referrals &amp; Token Requests</h3>
                 <div class="list-container glass-panel" id="md-queues">
                     <p class="text-muted">Loading queues...</p>
-                </div>
-
-                <!-- Emergency Queue -->
-                <h3 style="margin-top:25px;display:flex;align-items:center;gap:8px;">
-                    🚨 Emergency Alerts
-                    <span id="emergency-badge" style="display:none;background:#ef4444;color:white;font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:20px;animation:blink 1s infinite;">LIVE</span>
-                </h3>
-                <div class="list-container glass-panel" id="md-emergency-queue" style="margin-bottom:25px;">
-                    <p class="text-muted">No active emergencies.</p>
                 </div>
             </div>
 
@@ -721,6 +728,9 @@
             <button onclick="sendChatbotMessage()" class="submit-btn" style="width:auto;padding:0 15px;margin:0;">Send</button>
         </div>
     </div>
+
+    <!-- EMERGENCY TOAST CONTAINER -->
+    <div id="emergency-toast-container" style="position:fixed;top:80px;right:20px;z-index:9997;display:flex;flex-direction:column;gap:10px;pointer-events:none;"></div>
 
     <script src="app.js"></script>
 </body>

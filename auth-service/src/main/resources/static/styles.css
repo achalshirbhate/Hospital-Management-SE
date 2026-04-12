@@ -346,6 +346,11 @@ select.modal-input option { background: white; color: var(--text-main); }
 #history-table td { vertical-align: top; line-height: 1.5; }
 
 /* ── EMERGENCY ── */
+@keyframes slideInRight {
+    from { transform: translateX(120%); opacity: 0; }
+    to   { transform: translateX(0);    opacity: 1; }
+}
+
 @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); } 70% { box-shadow: 0 0 0 10px rgba(239,68,68,0); } 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); } }
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 .emergency-card { padding: 14px 16px; border-radius: 10px; margin-bottom: 10px; border: 1.5px solid #fecaca; background: #fef2f2; animation: blink-border 2s infinite; }
