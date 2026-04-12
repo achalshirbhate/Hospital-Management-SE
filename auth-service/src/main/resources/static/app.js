@@ -23,26 +23,29 @@ document.addEventListener('click', (e) => {
 // ========================
 // AUTH TOGGLE
 // ========================
+function showAuthForm(id) {
+    ['login-form','register-form','forgot-form','force-reset-form'].forEach(f => {
+        const el = document.getElementById(f);
+        if (el) el.className = 'auth-form hidden-form';
+    });
+    const target = document.getElementById(id);
+    if (target) target.className = 'auth-form active-form';
+}
+
 function switchForm(formType) {
     const loginBtn = document.getElementById('btn-login');
-    const regBtn = document.getElementById('btn-register');
+    const regBtn   = document.getElementById('btn-register');
     const indicator = document.getElementById('toggle-indicator');
-    const loginForm = document.getElementById('login-form');
-    const regForm = document.getElementById('register-form');
     document.getElementById('login-error').innerText = '';
     document.getElementById('reg-error').innerText = '';
-    document.getElementById('forgot-form').className = 'auth-form hidden-form';
-    document.getElementById('force-reset-form').className = 'auth-form hidden-form';
     if (formType === 'register') {
         loginBtn.classList.remove('active'); regBtn.classList.add('active');
         indicator.style.transform = 'translateX(100%)';
-        loginForm.className = 'auth-form hidden-form shift-left';
-        setTimeout(() => { regForm.className = 'auth-form active-form'; }, 100);
+        showAuthForm('register-form');
     } else {
         regBtn.classList.remove('active'); loginBtn.classList.add('active');
         indicator.style.transform = 'translateX(0)';
-        regForm.className = 'auth-form hidden-form';
-        setTimeout(() => { loginForm.className = 'auth-form active-form'; }, 100);
+        showAuthForm('login-form');
     }
 }
 
@@ -50,13 +53,11 @@ function switchForm(formType) {
 // FORGOT / TEMP PASSWORD
 // ========================
 function showForgotForm() {
-    document.getElementById('login-form').className = 'auth-form hidden-form shift-left';
-    document.getElementById('forgot-form').className = 'auth-form active-form';
+    showAuthForm('forgot-form');
 }
 
 function cancelForgot() {
-    document.getElementById('forgot-form').className = 'auth-form hidden-form';
-    document.getElementById('login-form').className = 'auth-form active-form';
+    showAuthForm('login-form');
     document.getElementById('otp-group').classList.add('hidden');
     document.getElementById('forgot-submit').innerText = 'Send OTP via Email';
     document.getElementById('forgot-email').readOnly = false;
@@ -96,7 +97,7 @@ document.getElementById('force-reset-form').addEventListener('submit', async (e)
         const res = await fetch(`${API_BASE}/auth/reset-password-temp?email=${encodeURIComponent(email)}&currentPassword=temp@123&newPassword=${newPwd}`, { method: 'POST' });
         if (!res.ok) throw new Error('Reset rejected.');
         alert('Account Secured! Transitioning...');
-        document.getElementById('force-reset-form').className = 'auth-form hidden-form';
+        showAuthForm('login-form');
         initApp(forceResetUserData);
     } catch(err) { alert('Failed: ' + err.message); }
 });
@@ -119,9 +120,8 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
         if (!res.ok) throw new Error(data.error || data.email || data.password || 'Login failed');
         if (data.requirePasswordReset) {
             forceResetUserData = data;
-            document.getElementById('login-form').className = 'auth-form hidden-form shift-left';
-            document.getElementById('force-reset-form').className = 'auth-form active-form';
             document.getElementById('force-email').value = email;
+            showAuthForm('force-reset-form');
         } else {
             initApp(data);
         }

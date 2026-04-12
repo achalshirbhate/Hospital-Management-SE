@@ -69,14 +69,13 @@ button, input, select, textarea { font-family: inherit; }
 
 .auth-wrapper {
     width: min(420px, 100%);
-    min-height: 520px;
-    padding: clamp(1.5rem, 4vw, 2.5rem) clamp(1.25rem, 3vw, 2.25rem);
-    position: relative;
-    overflow: hidden;
+    padding: clamp(1.5rem, 4vw, 2.5rem) clamp(1.25rem, 3vw, 2rem);
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: 16px;
     box-shadow: var(--shadow-md);
+    display: flex;
+    flex-direction: column;
 }
 
 .toggle-container {
@@ -87,11 +86,38 @@ button, input, select, textarea { font-family: inherit; }
 .toggle-btn.active { color: white; font-weight: 600; }
 .toggle-indicator { position: absolute; width: calc(50% - 4px); height: calc(100% - 8px); background: linear-gradient(135deg, var(--primary), var(--green)); border-radius: 8px; left: 4px; transition: 0.3s cubic-bezier(0.68,-0.55,0.265,1.55); z-index: 1; }
 
-.auth-form { width: 100%; transition: 0.35s; position: absolute; left: clamp(1.25rem, 3vw, 2.25rem); top: 108px; padding-right: clamp(1.25rem, 3vw, 2.25rem); }
-.hidden-form { opacity: 0; pointer-events: none; transform: translateX(18px); }
-.active-form { opacity: 1; pointer-events: all; transform: translateX(0); }
-.shift-left  { transform: translateX(-18px); opacity: 0; pointer-events: none; }
-.auth-form h2 { color: var(--text-main); margin-bottom: 1.25rem; font-size: clamp(1.1rem, 2.5vw, 1.4rem); font-weight: 700; }
+/* Auth forms — flex column, no absolute positioning */
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    transition: opacity 0.35s, transform 0.35s;
+}
+.hidden-form { display: none; }
+.active-form { display: flex; }
+.shift-left  { display: none; }
+
+.auth-form h2 {
+    color: var(--text-main);
+    margin-bottom: 1.5rem;
+    font-size: clamp(1.2rem, 2.5vw, 1.4rem);
+    font-weight: 700;
+    text-align: center;
+}
+
+/* Forgot password link */
+.forgot-link {
+    font-size: 0.8rem;
+    color: var(--primary);
+    text-decoration: none;
+    text-align: right;
+    display: block;
+    margin-top: -8px;
+    margin-bottom: 1rem;
+    font-weight: 500;
+    transition: color 0.18s;
+}
+.forgot-link:hover { color: var(--primary-hover); text-decoration: underline; }
 
 /* ── INPUTS ── */
 .input-group { margin-bottom: 1.1rem; }
