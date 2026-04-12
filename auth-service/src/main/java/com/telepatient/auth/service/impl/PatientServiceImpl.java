@@ -26,14 +26,10 @@ public class PatientServiceImpl implements PatientService {
             .user(user).message(message).type(type)
             .priority(priority).isRead(false).createdAt(LocalDateTime.now()).build());
     }
-    private final CommunicationTokenRepository tokenRepo;
-    private final UserRepository userRepo;
-    private final EmergencyAlertRepository emergencyRepo;
 
     @Override
     public List<HistoryDTO> getPatientHistory(Long patientId) {
         User patient = userRepo.findById(patientId).orElseThrow();
-        
         return consultationRepo.findByPatient(patient).stream()
             .map(c -> HistoryDTO.builder()
                 .doctorName(c.getDoctor().getFullName())

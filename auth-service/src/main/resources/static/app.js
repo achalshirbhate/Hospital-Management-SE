@@ -614,14 +614,25 @@ function downloadReport(type, format) {
         expenses: { pdf: `${API_BASE}/md/reports/expenses/pdf`, excel: `${API_BASE}/md/reports/expenses/excel` },
         doctors:  { pdf: `${API_BASE}/md/reports/doctors/pdf`,  excel: `${API_BASE}/md/reports/doctors/excel` }
     };
-    const url = map[type][format];
-    const ext = format === 'pdf' ? 'pdf' : 'xlsx';
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${type}_report.${ext}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    const url  = map[type][format];
+    const ext  = format === 'pdf' ? 'pdf' : 'xlsx';
+    const name = `${type}_report.${ext}`;
+
+    fetch(url)
+        .then(res => {
+            if (!res.ok) throw new Error('Server error: ' + res.status);
+            return res.blob();
+        })
+        .then(blob => {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+        })
+        .catch(e => alert('Download failed: ' + e.message));
 }
 
 function downloadMedicalReport(report) {
@@ -1459,14 +1470,22 @@ function openReportViewer({ title, meta, diagnosis, prescription, referralInfo, 
     const content = document.getElementById('report-viewer-content');
     if (!fileUrl) {
         content.innerHTML = '<p class="text-muted" style="padding:16px;text-align:center;">No file attached to this record.</p>';
-    } else if (fileType === 'IMAGE' || fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) || fileUrl.startsWith('data:image')) {
+    } else if (fileUrl.startsWith('data:image') || fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) || fileType === 'IMAGE') {
         content.innerHTML = `<img src="${fileUrl}" style="width:100%;border-radius:10px;max-height:480px;object-fit:contain;"
             onerror="this.outerHTML='<p style=color:var(--danger);padding:12px>Image could not be loaded.</p>'">`;
-    } else if (fileType === 'PDF' || fileUrl.includes('.pdf') || fileUrl.startsWith('data:application/pdf')) {
+    } else if (fileUrl.startsWith('data:application/pdf') || fileUrl.includes('.pdf') || fileType === 'PDF') {
         content.innerHTML = `<iframe src="${fileUrl}" style="width:100%;height:460px;border-radius:10px;border:1px solid var(--border);"></iframe>
             <p style="margin-top:8px;font-size:0.8rem;color:var(--text-muted);">PDF not loading? <a href="${fileUrl}" target="_blank" style="color:var(--primary);">Open in new tab</a></p>`;
+    } else if (fileUrl.startsWith('data:')) {
+        // Other base64 data
+        content.innerHTML = `<p style="padding:12px;font-size:0.88rem;color:var(--text-muted);">File stored as base64. <a href="${fileUrl}" download="report" style="color:var(--primary);font-weight:600;">Click to download</a></p>`;
     } else {
-        content.innerHTML = `<div style="background:var(--bg-secondary);padding:16px;border-radius:10px;white-space:pre-wrap;font-size:0.9rem;line-height:1.6;">${fileUrl}</div>`;
+        // Plain URL — show as clickable link, do NOT embed
+        content.innerHTML = `<div style="padding:16px;background:var(--bg-secondary);border-radius:10px;text-align:center;">
+            <div style="font-size:2rem;margin-bottom:10px;">🔗</div>
+            <p style="font-size:0.9rem;color:var(--text-muted);margin-bottom:12px;">External report link attached.</p>
+            <a href="${fileUrl}" target="_blank" style="display:inline-block;padding:10px 20px;background:var(--primary);color:white;border-radius:8px;text-decoration:none;font-weight:600;font-size:0.88rem;">Open Report ↗</a>
+        </div>`;
     }
 
     // Chat button — only when active chat session
