@@ -112,6 +112,20 @@
             <div class="nav-links" id="nav-links">
                 <button class="nav-btn" onclick="handleLaunchpadClick()">&#128640; LaunchPad</button>
                 <button class="nav-btn" onclick="openModal('social-modal')">&#128241; Social Feed</button>
+                <!-- Notification Bell -->
+                <div class="notif-wrap" id="notif-wrap" style="display:none;position:relative;">
+                    <button class="nav-btn" onclick="toggleNotifPanel()" style="position:relative;padding:8px 10px;" title="Notifications">
+                        🔔
+                        <span id="notif-badge" style="display:none;position:absolute;top:4px;right:4px;background:#ef4444;color:white;font-size:0.6rem;font-weight:700;min-width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;line-height:1;">0</span>
+                    </button>
+                    <div id="notif-panel" style="display:none;position:absolute;right:0;top:calc(100% + 8px);width:320px;max-height:420px;overflow-y:auto;background:white;border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,0.12);z-index:2000;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border);">
+                            <span style="font-weight:700;font-size:0.95rem;">🔔 Notifications</span>
+                            <button onclick="markAllNotifRead()" style="background:none;border:none;color:var(--primary);font-size:0.78rem;font-weight:600;cursor:pointer;">Mark all read</button>
+                        </div>
+                        <div id="notif-list" style="padding:8px 0;"></div>
+                    </div>
+                </div>
                 <div class="user-badge" id="user-badge">User Name</div>
                 <button class="nav-btn danger" onclick="logout()">Logout</button>
             </div>
@@ -299,6 +313,7 @@
                         </select>
                     </div>
                     <button class="submit-btn outline" style="width:auto;padding:9px 16px;white-space:nowrap;" onclick="loadDoctorDashboard()">↺ Refresh</button>
+                    <button class="submit-btn" style="width:auto;padding:9px 16px;white-space:nowrap;" onclick="openModal('add-patient-doctor-modal')">➕ Add Patient</button>
                 </div>
 
                 <!-- Patient List -->
@@ -630,6 +645,21 @@
             <div id="upload-report-status" style="font-size:0.8rem;color:var(--primary);margin-bottom:8px;"></div>
             <button class="submit-btn" onclick="submitReportUpload()">Upload Report</button>
             <button class="submit-btn outline mt-2" onclick="closeModal('upload-report-modal')">Cancel</button>
+        </div>
+    </div>
+
+    <!-- ADD PATIENT MODAL (Doctor) -->
+    <div id="add-patient-doctor-modal" class="modal">
+        <div class="modal-content glass-panel">
+            <h2>➕ Add New Patient</h2>
+            <p class="text-muted" style="margin-bottom:16px;font-size:0.85rem;">Patient will be registered and assigned to you with password <strong>temp@123</strong>.</p>
+            <input type="text" id="ap-name" placeholder="Full Name *" class="modal-input" required>
+            <input type="email" id="ap-email" placeholder="Email Address *" class="modal-input" required>
+            <input type="number" id="ap-age" placeholder="Age (optional)" class="modal-input" min="1" max="120">
+            <textarea id="ap-note" placeholder="Initial medical note (optional)" class="modal-input" rows="2"></textarea>
+            <div id="ap-error" style="color:var(--danger);font-size:0.83rem;margin-bottom:8px;"></div>
+            <button class="submit-btn" onclick="submitAddPatient()">Add Patient</button>
+            <button class="submit-btn outline mt-2" onclick="closeModal('add-patient-doctor-modal')">Cancel</button>
         </div>
     </div>
 

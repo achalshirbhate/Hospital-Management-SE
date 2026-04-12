@@ -4,8 +4,6 @@ import com.telepatient.auth.dto.request.TokenRequestDTO;
 import com.telepatient.auth.dto.response.HistoryDTO;
 import com.telepatient.auth.entity.*;
 import com.telepatient.auth.repository.*;
-import com.telepatient.auth.entity.EmergencyAlert;
-import com.telepatient.auth.repository.EmergencyAlertRepository;
 import com.telepatient.auth.service.PatientService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,6 +16,16 @@ import java.util.stream.Collectors;
 public class PatientServiceImpl implements PatientService {
 
     private final ConsultationRepository consultationRepo;
+    private final CommunicationTokenRepository tokenRepo;
+    private final UserRepository userRepo;
+    private final EmergencyAlertRepository emergencyRepo;
+    private final NotificationRepository notifRepo;
+
+    private void notify(User user, String message, String type, String priority) {
+        notifRepo.save(Notification.builder()
+            .user(user).message(message).type(type)
+            .priority(priority).isRead(false).createdAt(LocalDateTime.now()).build());
+    }
     private final CommunicationTokenRepository tokenRepo;
     private final UserRepository userRepo;
     private final EmergencyAlertRepository emergencyRepo;
@@ -42,17 +50,11 @@ public class PatientServiceImpl implements PatientService {
     public void requestCommunicationToken(TokenRequestDTO request) {
         User patient = userRepo.findById(request.getPatientId()).orElseThrow();
         User md = userRepo.findById(request.getMdId()).orElseThrow();
-
         CommunicationToken token = CommunicationToken.builder()
-                .patient(patient)
-                .mainDoctor(md)
-                .type(request.getType())
-                .status(TokenStatus.REQUESTED)
-                .requestedAt(LocalDateTime.now())
-                .isFrozen(false) // Wait to be approved by MD
-                .build();
-                
+                .patient(patient).mainDoctor(md).type(request.getType())
+                .status(TokenStatus.REQUESTED).requestedAt(LocalDateTime.now()).isFrozen(false).build();
         tokenRepo.save(token);
+        notify(patient, "📅 Your " + request.getType() + " session request has been sent to MD.", "APPOINTMENT", "MEDIUM");
     }
 
     @Override
@@ -65,12 +67,9 @@ public class PatientServiceImpl implements PatientService {
     public String triggerEmergencyAlert(Long patientId, String level) {
         User patient = userRepo.findById(patientId).orElseThrow();
         EmergencyAlert alert = EmergencyAlert.builder()
-                .patient(patient)
-                .level(level)
-                .alertTime(LocalDateTime.now())
-                .acknowledged(false)
-                .build();
+                .patient(patient).level(level).alertTime(LocalDateTime.now()).acknowledged(false).build();
         emergencyRepo.save(alert);
+        notify(patient, "🚨 Emergency alert (" + level + ") sent. Hospital counter notified!", "EMERGENCY", "HIGH");
         System.out.println("\n========================================");
         System.out.println("🚨 [" + level + "] EMERGENCY from: " + patient.getFullName() + " at " + alert.getAlertTime());
         System.out.println("========================================\n");

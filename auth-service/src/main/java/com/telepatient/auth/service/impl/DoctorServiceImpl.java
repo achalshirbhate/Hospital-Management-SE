@@ -4,6 +4,8 @@ import java.util.Set;
 import java.util.HashSet;
 
 import com.telepatient.auth.dto.request.ReferralRequestDTO;
+import com.telepatient.auth.entity.Notification;
+import com.telepatient.auth.repository.NotificationRepository;
 import com.telepatient.auth.dto.response.PatientDTO;
 import com.telepatient.auth.entity.*;
 import com.telepatient.auth.repository.*;
@@ -22,6 +24,13 @@ public class DoctorServiceImpl implements DoctorService {
     private final UserRepository userRepo;
     private final ReferralRequestRepository referralRepo;
     private final PatientProfileRepository profileRepo;
+    private final NotificationRepository notifRepo;
+
+    private void notify(User user, String message, String type, String priority) {
+        notifRepo.save(Notification.builder()
+            .user(user).message(message).type(type)
+            .priority(priority).isRead(false).createdAt(LocalDateTime.now()).build());
+    }
 
     @Override
     public List<PatientDTO> getAssignedPatients(Long doctorId) {
@@ -62,6 +71,11 @@ public class DoctorServiceImpl implements DoctorService {
                 .build();
 
         consultationRepo.save(consultation);
+        notify(patient, "📋 Dr. " + doctor.getFullName() + " updated your clinical notes.", "REPORT", "MEDIUM");
+        if (prescription != null && !prescription.isBlank())
+            notify(patient, "💊 New prescription added by Dr. " + doctor.getFullName(), "PRESCRIPTION", "MEDIUM");
+        if (reportsUrl != null && !reportsUrl.isBlank())
+            notify(patient, "📎 A new report has been uploaded by Dr. " + doctor.getFullName(), "REPORT", "MEDIUM");
     }
 
     @Override
@@ -80,6 +94,7 @@ public class DoctorServiceImpl implements DoctorService {
                 .build();
 
         referralRepo.save(referral);
+        notify(patient, "🔁 Dr. " + fromDoctor.getFullName() + " has requested a referral for you to " + request.getRequestedSpecialty(), "GENERAL", "MEDIUM");
     }
 
     @Override

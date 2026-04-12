@@ -183,15 +183,23 @@ function initApp(userData) {
         const fab = document.getElementById('emergency-fab');
         if (fab) fab.style.display = 'block';
         loadPatientDashboard();
+        // Show notification bell for patients
+        const notifWrap = document.getElementById('notif-wrap');
+        if (notifWrap) notifWrap.style.display = 'block';
+        loadNotifications();
+        setInterval(loadNotifications, 15000);
     }
     loadSocialFeed();
 }
 
 function logout() {
     currentUser = null;
+    clearInterval(window._notifInterval);
+    const notifWrap = document.getElementById('notif-wrap');
+    if (notifWrap) notifWrap.style.display = 'none';
     document.getElementById('auth-container').classList.remove('hidden');
     document.getElementById('app-container').classList.add('hidden');
-    document.getElementById('login-form').className = 'auth-form active-form';
+    showAuthForm('login-form');
 }
 
 // ========================
@@ -1238,6 +1246,114 @@ function toggleDropdown(id) {
 document.addEventListener('click', (e) => {
     if (!e.target.closest('.dropdown')) document.querySelectorAll('.dropdown-menu.open').forEach(m => m.classList.remove('open'));
 });
+
+// ========================
+// NOTIFICATIONS
+// ========================
+let notifPanelOpen = false;
+
+async function loadNotifications() {
+    if (!currentUser) return;
+    try {
+        const res = await fetch(`${API_BASE}/notifications/${currentUser.userId}`);
+        const data = await res.json();
+        const unread = data.filter(n => !n.read).length;
+        const badge = document.getElementById('notif-badge');
+        if (badge) {
+            badge.style.display = unread > 0 ? 'flex' : 'none';
+            badge.innerText = unread > 9 ? '9+' : unread;
+        }
+        const list = document.getElementById('notif-list');
+        if (!list) return;
+        if (!data.length) {
+            list.innerHTML = '<p class="text-muted" style="padding:16px;text-align:center;font-size:0.88rem;">No notifications yet.</p>';
+            return;
+        }
+        const icons = { REPORT:'📋', PRESCRIPTION:'💊', APPOINTMENT:'📅', CHAT:'💬', EMERGENCY:'🚨', GENERAL:'📢' };
+        const colors = { HIGH:'#fef2f2', MEDIUM:'#fffbeb', LOW:'#f8fafc' };
+        const dotColors = { HIGH:'#ef4444', MEDIUM:'#f59e0b', LOW:'#3b82f6' };
+        list.innerHTML = data.map(n => `
+            <div onclick="markNotifRead(${n.id}, this)" style="padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--border);background:${n.read ? 'white' : colors[n.priority] || '#f8fafc'};transition:background 0.15s;"
+                onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='${n.read ? 'white' : colors[n.priority] || '#f8fafc'}'">
+                <div style="display:flex;align-items:flex-start;gap:10px;">
+                    <span style="font-size:1.1rem;flex-shrink:0;">${icons[n.type] || '🔔'}</span>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:0.85rem;font-weight:${n.read ? '400' : '600'};color:var(--text-main);line-height:1.4;">${n.message}</div>
+                        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:3px;">${timeAgo(n.createdAt)}</div>
+                    </div>
+                    ${!n.read ? `<span style="width:8px;height:8px;border-radius:50%;background:${dotColors[n.priority] || '#3b82f6'};flex-shrink:0;margin-top:4px;"></span>` : ''}
+                </div>
+            </div>`).join('');
+    } catch(e) {}
+}
+
+function toggleNotifPanel() {
+    const panel = document.getElementById('notif-panel');
+    if (!panel) return;
+    notifPanelOpen = !notifPanelOpen;
+    panel.style.display = notifPanelOpen ? 'block' : 'none';
+    if (notifPanelOpen) loadNotifications();
+}
+
+async function markNotifRead(id, el) {
+    try {
+        await fetch(`${API_BASE}/notifications/${id}/read`, { method: 'PUT' });
+        if (el) el.style.background = 'white';
+        loadNotifications();
+    } catch(e) {}
+}
+
+async function markAllNotifRead() {
+    if (!currentUser) return;
+    try {
+        await fetch(`${API_BASE}/notifications/${currentUser.userId}/read-all`, { method: 'PUT' });
+        loadNotifications();
+    } catch(e) {}
+}
+
+function timeAgo(dateStr) {
+    const diff = Math.floor((Date.now() - new Date(dateStr)) / 1000);
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return Math.floor(diff/60) + ' min ago';
+    if (diff < 86400) return Math.floor(diff/3600) + ' hr ago';
+    return Math.floor(diff/86400) + ' day(s) ago';
+}
+
+// Close notif panel on outside click
+document.addEventListener('click', (e) => {
+    const wrap = document.getElementById('notif-wrap');
+    if (wrap && !wrap.contains(e.target) && notifPanelOpen) {
+        document.getElementById('notif-panel').style.display = 'none';
+        notifPanelOpen = false;
+    }
+});
+
+// ========================
+// ADD PATIENT (Doctor)
+// ========================
+async function submitAddPatient() {
+    const name  = document.getElementById('ap-name').value.trim();
+    const email = document.getElementById('ap-email').value.trim();
+    const age   = document.getElementById('ap-age').value;
+    const errEl = document.getElementById('ap-error');
+    errEl.innerText = '';
+    if (!name) return (errEl.innerText = 'Full name is required.');
+    if (!email) return (errEl.innerText = 'Email is required.');
+    try {
+        const res = await fetch(
+            `${API_BASE}/doctor/add-patient?doctorId=${currentUser.userId}${age ? '&age=' + age : ''}`,
+            { method: 'POST', headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({ fullName: name, email: email, password: 'temp@123' }) }
+        );
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.email || err.fullName || 'Failed to add patient');
+        }
+        alert(`✅ Patient "${name}" added successfully! Default password: temp@123`);
+        closeModal('add-patient-doctor-modal');
+        loadDoctorDashboard();
+    } catch(e) { errEl.innerText = e.message; }
+}
 
 // ========================
 // FILE UPLOAD
