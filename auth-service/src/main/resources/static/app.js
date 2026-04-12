@@ -254,41 +254,126 @@ function closeChat() {
 }
 
 // ========================
-// VIDEO CALL
+// VIDEO CALL — WebRTC + WebSocket Signaling
 // ========================
-let localStream = null;
-let peerConnection = null;
+let localStream      = null;
+let peerConnection   = null;
+let signalingSocket  = null;
 let activeVideoTokenId = null;
+let isInitiator      = false;
+
+const ICE_SERVERS = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+};
 
 function openVideoCall(tokenId, scheduleTime) {
     activeVideoTokenId = tokenId;
     document.getElementById('video-schedule').innerText = scheduleTime ? `Session: ${scheduleTime}` : 'Active Session';
     document.getElementById('video-terminate-btn').classList.toggle('hidden', currentUser.role !== 'MAIN_DOCTOR');
     openModal('video-modal');
-    startLocalCamera();
+    startVideoCall(tokenId);
 }
 
-async function startLocalCamera() {
+async function startVideoCall(tokenId) {
+    // 1. Get local media
     try {
         localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         document.getElementById('local-video').srcObject = localStream;
     } catch(e) {
-        alert('Camera/Microphone access denied or unavailable: ' + e.message);
+        alert('Camera/Microphone access denied: ' + e.message);
+        return;
     }
-    const remoteVideo = document.getElementById('remote-video');
-    remoteVideo.addEventListener('play', () => {
+
+    // 2. Connect to signaling WebSocket
+    const wsUrl = `ws://${location.host}/ws/video`;
+    signalingSocket = new WebSocket(wsUrl);
+
+    signalingSocket.onopen = () => {
+        // Join the room for this token
+        signalingSocket.send(JSON.stringify({ type: 'join', roomId: String(tokenId) }));
+    };
+
+    signalingSocket.onmessage = async (event) => {
+        const msg = JSON.parse(event.data);
+
+        if (msg.type === 'peer-joined') {
+            // We are the first one — become initiator and create offer
+            isInitiator = true;
+            await createPeerConnection(tokenId);
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            signalingSocket.send(JSON.stringify({ type: 'offer', roomId: String(tokenId), sdp: offer }));
+        }
+
+        else if (msg.type === 'offer') {
+            // We received an offer — create answer
+            isInitiator = false;
+            await createPeerConnection(tokenId);
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            signalingSocket.send(JSON.stringify({ type: 'answer', roomId: String(tokenId), sdp: answer }));
+        }
+
+        else if (msg.type === 'answer') {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+        }
+
+        else if (msg.type === 'candidate') {
+            try { await peerConnection.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch(e) {}
+        }
+
+        else if (msg.type === 'peer-left') {
+            document.getElementById('remote-video').srcObject = null;
+            const ph = document.getElementById('remote-placeholder');
+            if (ph) { ph.style.display = 'flex'; ph.innerText = 'Other party left the call.'; }
+        }
+    };
+
+    signalingSocket.onerror = (e) => console.warn('Signaling WS error', e);
+}
+
+async function createPeerConnection(tokenId) {
+    peerConnection = new RTCPeerConnection(ICE_SERVERS);
+
+    // Add local tracks
+    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+    // Receive remote stream
+    peerConnection.ontrack = (event) => {
+        const remoteVideo = document.getElementById('remote-video');
+        remoteVideo.srcObject = event.streams[0];
         const ph = document.getElementById('remote-placeholder');
         if (ph) ph.style.display = 'none';
-    });
+    };
+
+    // Send ICE candidates via signaling
+    peerConnection.onicecandidate = (event) => {
+        if (event.candidate && signalingSocket && signalingSocket.readyState === WebSocket.OPEN) {
+            signalingSocket.send(JSON.stringify({
+                type: 'candidate',
+                roomId: String(tokenId),
+                candidate: event.candidate
+            }));
+        }
+    };
+
+    peerConnection.onconnectionstatechange = () => {
+        console.log('WebRTC state:', peerConnection.connectionState);
+    };
 }
 
 function closeVideoCall() {
-    if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
-    if (peerConnection) { peerConnection.close(); peerConnection = null; }
-    document.getElementById('local-video').srcObject = null;
+    if (localStream)     { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+    if (peerConnection)  { peerConnection.close(); peerConnection = null; }
+    if (signalingSocket) { signalingSocket.close(); signalingSocket = null; }
+    document.getElementById('local-video').srcObject  = null;
     document.getElementById('remote-video').srcObject = null;
     const ph = document.getElementById('remote-placeholder');
-    if (ph) ph.style.display = 'flex';
+    if (ph) { ph.style.display = 'flex'; ph.innerText = 'Waiting for other party...'; }
     activeVideoTokenId = null;
     closeModal('video-modal');
     if (currentUser) {
