@@ -214,6 +214,23 @@ function logout() {
     showAuthForm('login-form');
 }
 
+function refreshDashboard() {
+    if (!currentUser) return;
+    const btn = document.querySelector('button[onclick="refreshDashboard()"]');
+    if (btn) { btn.style.transform = 'rotate(360deg)'; btn.style.transition = 'transform 0.5s'; setTimeout(() => { btn.style.transform = ''; }, 500); }
+    if (currentUser.role === 'MAIN_DOCTOR') {
+        loadMDDashboard();
+        loadMDQueues();
+        loadMDEmergencyQueue();
+    } else if (currentUser.role === 'DOCTOR') {
+        loadDoctorDashboard();
+    } else {
+        loadPatientDashboard();
+        loadNotifications();
+    }
+    loadSocialFeed();
+}
+
 // ========================
 // CHAT
 // ========================
@@ -1833,7 +1850,7 @@ const chatbotKB = {
     social: 'Social Feed: Only Main Doctor can post (text, YouTube links, images). Everyone can view by clicking Social Feed in navbar.',
     password: 'Forgot password: Click Forgot Password on login → enter email → OTP appears in Spring Boot console → enter OTP and new password.',
     emergency: '🚨 Emergency Contacts:\n\n🔴 Hospital Emergency: <a href="tel:108" style="color:#ef4444;font-weight:700;">108</a>\n🚑 Ambulance: <a href="tel:102" style="color:#ef4444;font-weight:700;">102</a>\n🚒 Fire: <a href="tel:101" style="color:#f59e0b;font-weight:700;">101</a>\n👮 Police: <a href="tel:100" style="color:#3b82f6;font-weight:700;">100</a>\n📞 Hospital Counter: <a href="tel:+911234567890" style="color:#22c55e;font-weight:700;">+91 12345 67890</a>\n\nOr use the 🚨 red button (bottom-right) to instantly alert hospital staff.',
-    default: 'I can help with: revenue/expenses, chat/video sessions, token requests, referrals, patient assignment, roles, reports, launchpad, social feed, passwords, emergency numbers. What would you like to know?'
+    default: 'I can help with: chat/video sessions, token requests, referrals, patient assignment, roles, reports, launchpad, social feed, passwords, emergency numbers. What would you like to know?'
 };
 
 function toggleChatbot() {
