@@ -151,7 +151,7 @@ public class MDController {
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=revenue_report.xlsx")
             .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-            .body(((com.telepatient.auth.service.impl.DashboardServiceImpl) dashboardService).generateRevenueReport());
+            .body(dashboardService.generateRevenueReport());
     }
 
     @GetMapping("/reports/expenses/excel")
@@ -159,7 +159,7 @@ public class MDController {
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=expense_report.xlsx")
             .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-            .body(((com.telepatient.auth.service.impl.DashboardServiceImpl) dashboardService).generateExpenseReport());
+            .body(dashboardService.generateExpenseReport());
     }
 
     @GetMapping("/reports/doctors/excel")
@@ -167,7 +167,7 @@ public class MDController {
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=doctor_stats.xlsx")
             .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-            .body(((com.telepatient.auth.service.impl.DashboardServiceImpl) dashboardService).generateDoctorStatsReport());
+            .body(dashboardService.generateDoctorStatsReport());
     }
 
     @GetMapping("/reports/revenue/pdf")
@@ -175,7 +175,7 @@ public class MDController {
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=revenue_report.pdf")
             .contentType(MediaType.APPLICATION_PDF)
-            .body(((com.telepatient.auth.service.impl.DashboardServiceImpl) dashboardService).generateRevenuePdf());
+            .body(dashboardService.generateRevenuePdf());
     }
 
     @GetMapping("/reports/expenses/pdf")
@@ -183,7 +183,7 @@ public class MDController {
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=expense_report.pdf")
             .contentType(MediaType.APPLICATION_PDF)
-            .body(((com.telepatient.auth.service.impl.DashboardServiceImpl) dashboardService).generateExpensePdf());
+            .body(dashboardService.generateExpensePdf());
     }
 
     @GetMapping("/reports/doctors/pdf")
@@ -191,7 +191,7 @@ public class MDController {
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=doctor_stats.pdf")
             .contentType(MediaType.APPLICATION_PDF)
-            .body(((com.telepatient.auth.service.impl.DashboardServiceImpl) dashboardService).generateDoctorStatsPdf());
+            .body(dashboardService.generateDoctorStatsPdf());
     }
 
     @GetMapping("/emergencies")
