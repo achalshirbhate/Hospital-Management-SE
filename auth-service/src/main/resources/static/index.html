@@ -147,6 +147,23 @@
             </div>
         </nav>
 
+        <!-- EMERGENCY ALERT BAR (MD only, shown when active emergencies exist) -->
+        <div id="emergency-alert-bar" style="display:none;width:100%;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;padding:12px 24px;border-radius:12px;margin-bottom:16px;cursor:pointer;box-shadow:0 4px 16px rgba(239,68,68,0.35);animation:blink-border 1.5s infinite;" onclick="toggleEmergencyPanel()">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <span style="font-size:1.4rem;animation:pulse-red 1.5s infinite;">🚨</span>
+                    <div>
+                        <div style="font-weight:800;font-size:1rem;letter-spacing:0.3px;">EMERGENCY ALERT ACTIVE</div>
+                        <div id="emergency-bar-detail" style="font-size:0.82rem;opacity:0.9;margin-top:2px;">Loading...</div>
+                    </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span id="emergency-bar-count" style="background:white;color:#dc2626;font-weight:800;font-size:0.9rem;padding:4px 14px;border-radius:20px;">0 Active</span>
+                    <span style="font-size:0.82rem;opacity:0.85;font-weight:600;">Click to manage →</span>
+                </div>
+            </div>
+        </div>
+
         <div class="dashboard-content">
 
             <!-- MAIN DOCTOR DASHBOARD -->

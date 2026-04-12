@@ -1080,6 +1080,25 @@ async function loadMDEmergencyQueue() {
         const countEl = document.getElementById('md-emergency-count');
         if (countEl) countEl.innerText = data.length;
 
+        // Show/hide full-width alert bar
+        const bar = document.getElementById('emergency-alert-bar');
+        const barCount = document.getElementById('emergency-bar-count');
+        const barDetail = document.getElementById('emergency-bar-detail');
+        if (bar) {
+            if (data.length > 0) {
+                bar.style.display = 'block';
+                if (barCount) barCount.innerText = data.length + ' Active';
+                if (barDetail) {
+                    const critical = data.filter(e => e.level === 'CRITICAL');
+                    const names = data.slice(0, 2).map(e => e.patientName).join(', ');
+                    const more = data.length > 2 ? ` +${data.length - 2} more` : '';
+                    barDetail.innerText = (critical.length ? `🔴 ${critical.length} Critical · ` : '') + names + more;
+                }
+            } else {
+                bar.style.display = 'none';
+            }
+        }
+
         // Show toast for NEW alerts
         if (data.length > _lastEmergencyCount) {
             const newest = data[0];
