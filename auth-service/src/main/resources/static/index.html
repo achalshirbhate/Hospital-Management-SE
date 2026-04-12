@@ -155,18 +155,6 @@
 
                 <div class="analytics-grid">
                     <div class="metric-card glass-panel">
-                        <h3>Total Revenue</h3>
-                        <div class="metric-value">&#8377;<span id="md-rev">0</span></div>
-                    </div>
-                    <div class="metric-card glass-panel">
-                        <h3>Total Expenses</h3>
-                        <div class="metric-value">&#8377;<span id="md-exp">0</span></div>
-                    </div>
-                    <div class="metric-card glass-panel">
-                        <h3>Profit / Loss</h3>
-                        <div class="metric-value">&#8377;<span id="md-profit">0</span></div>
-                    </div>
-                    <div class="metric-card glass-panel">
                         <h3>Patient Count</h3>
                         <div class="metric-value"><span id="md-patients">0</span></div>
                     </div>
@@ -182,6 +170,11 @@
                         <h3>Pending Tokens</h3>
                         <div class="metric-value"><span id="md-pending-tokens">0</span></div>
                     </div>
+                    <!-- Live Emergency Alert Card -->
+                    <div class="metric-card glass-panel" style="border:1.5px solid #fecaca;background:#fef2f2;cursor:pointer;" onclick="toggleEmergencyPanel()">
+                        <h3 style="color:#dc2626;">🚨 Active Emergencies</h3>
+                        <div class="metric-value" id="md-emergency-count" style="background:linear-gradient(135deg,#ef4444,#dc2626);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">0</div>
+                    </div>
                 </div>
 
                 <!-- Doctor Activity -->
@@ -191,41 +184,6 @@
                 </div>
 
                 <div class="md-actions">
-                    <div class="action-group glass-panel">
-                        <div class="action-group-title">&#128196; Reports</div>
-                        <div class="report-row">
-                            <div class="report-item">
-                                <span>Revenue</span>
-                                <div class="dropdown">
-                                    <button class="report-btn main" onclick="toggleDropdown('dd-revenue')">&#11015; Download</button>
-                                    <div class="dropdown-menu" id="dd-revenue">
-                                        <div onclick="downloadReport('revenue','pdf'); toggleDropdown('dd-revenue')">&#128196; PDF</div>
-                                        <div onclick="downloadReport('revenue','excel'); toggleDropdown('dd-revenue')">&#128202; Excel</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="report-item">
-                                <span>Expenses</span>
-                                <div class="dropdown">
-                                    <button class="report-btn main" onclick="toggleDropdown('dd-expenses')">&#11015; Download</button>
-                                    <div class="dropdown-menu" id="dd-expenses">
-                                        <div onclick="downloadReport('expenses','pdf'); toggleDropdown('dd-expenses')">&#128196; PDF</div>
-                                        <div onclick="downloadReport('expenses','excel'); toggleDropdown('dd-expenses')">&#128202; Excel</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="report-item">
-                                <span>Doctor Stats</span>
-                                <div class="dropdown">
-                                    <button class="report-btn main" onclick="toggleDropdown('dd-doctors')">&#11015; Download</button>
-                                    <div class="dropdown-menu" id="dd-doctors">
-                                        <div onclick="downloadReport('doctors','pdf'); toggleDropdown('dd-doctors')">&#128196; PDF</div>
-                                        <div onclick="downloadReport('doctors','excel'); toggleDropdown('dd-doctors')">&#128202; Excel</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                     <div class="action-group glass-panel">
                         <div class="action-group-title">&#9881;&#65039; Actions</div>
                         <div class="action-btns">

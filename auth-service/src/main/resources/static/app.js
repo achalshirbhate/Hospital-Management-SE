@@ -359,9 +359,6 @@ async function loadMDDashboard() {
     try {
         const res = await fetch(`${API_BASE}/md/dashboard`);
         const data = await res.json();
-        document.getElementById('md-rev').innerText = data.totalRevenue || '0.0';
-        document.getElementById('md-exp').innerText = data.totalExpenses || '0.0';
-        document.getElementById('md-profit').innerText = data.profitLoss || '0.0';
         document.getElementById('md-patients').innerText = data.patientCount || '0';
         if (document.getElementById('md-appointments-count')) document.getElementById('md-appointments-count').innerText = data.totalAppointments || '0';
         if (document.getElementById('md-pending-refs')) document.getElementById('md-pending-refs').innerText = data.pendingReferrals || '0';
@@ -373,6 +370,16 @@ async function loadMDDashboard() {
             document.getElementById('md-activity').innerHTML = actHtml || '<p class="text-muted">No activity yet.</p>';
         }
     } catch(e) { console.warn('Analytics fetch failed'); }
+
+    // Update emergency count card
+    try {
+        const eRes = await fetch(`${API_BASE}/md/emergencies`);
+        if (eRes.ok) {
+            const eData = await eRes.json();
+            const countEl = document.getElementById('md-emergency-count');
+            if (countEl) countEl.innerText = eData.length;
+        }
+    } catch(e) {}
 
     try {
         const pRes = await fetch(`${API_BASE}/md/patients`);
@@ -1069,6 +1076,9 @@ async function loadMDEmergencyQueue() {
             badge.style.display = data.length > 0 ? 'flex' : 'none';
             badge.innerText = data.length > 9 ? '9+' : data.length;
         }
+        // Sync the dashboard count card
+        const countEl = document.getElementById('md-emergency-count');
+        if (countEl) countEl.innerText = data.length;
 
         // Show toast for NEW alerts
         if (data.length > _lastEmergencyCount) {
