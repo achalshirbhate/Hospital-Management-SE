@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tele Patient Handling System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+    <div class="background">
+        <div class="blob shape1"></div>
+        <div class="blob shape2"></div>
+    </div>
+
+    <!-- Auth View -->
+    <div class="container" id="auth-container">
+        <div class="welcome-box">
+            <h1>Tele Patient</h1>
+            <p>Your health, securely managed.</p>
+        </div>
+        <div class="auth-wrapper glass-panel">
+            <div class="toggle-container">
+                <div class="toggle-btn active" id="btn-login" onclick="switchForm('login')">Login</div>
+                <div class="toggle-btn" id="btn-register" onclick="switchForm('register')">Register</div>
+                <div class="toggle-indicator" id="toggle-indicator"></div>
+            </div>
+
+            <!-- Login -->
+            <form id="login-form" class="auth-form active-form">
+                <h2>Welcome Back</h2>
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="login-email" required>
+                </div>
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="login-password" required>
+                </div>
+                <a href="#" onclick="showForgotForm()" class="forgot-link">Forgot Password?</a>
+                <div class="error-msg" id="login-error"></div>
+                <button type="submit" class="submit-btn" id="login-submit">Sign In <div class="spinner loader"></div></button>
+            </form>
+
+            <!-- Forgot Password -->
+            <form id="forgot-form" class="auth-form hidden-form">
+                <h2>Reset Password</h2>
+                <div class="input-group">
+                    <label>Registered Email</label>
+                    <input type="email" id="forgot-email" required>
+                </div>
+                <div id="otp-group" class="hidden">
+                    <div class="input-group">
+                        <label>Enter 6-digit OTP</label>
+                        <input type="text" id="forgot-otp">
+                    </div>
+                    <div class="input-group">
+                        <label>New Password</label>
+                        <input type="password" id="forgot-new-pwd">
+                    </div>
+                </div>
+                <div class="error-msg" id="forgot-error"></div>
+                <button type="button" class="submit-btn outline" style="margin-bottom:10px;" onclick="cancelForgot()">Back to Login</button>
+                <button type="submit" class="submit-btn" id="forgot-submit">Send OTP via Email</button>
+            </form>
+
+            <!-- Force Reset -->
+            <form id="force-reset-form" class="auth-form hidden-form">
+                <h2>Update Temp Password</h2>
+                <p class="text-muted" style="margin-bottom:15px;font-size:0.85rem;">You logged in with a temporary password. Please secure your account.</p>
+                <input type="hidden" id="force-email">
+                <div class="input-group">
+                    <label>New Secure Password</label>
+                    <input type="password" id="force-new-pwd" required>
+                </div>
+                <div class="error-msg" id="force-error"></div>
+                <button type="submit" class="submit-btn" id="force-submit">Secure Account & Proceed</button>
+            </form>
+
+            <!-- Register -->
+            <form id="register-form" class="auth-form hidden-form">
+                <h2>Create Account</h2>
+                <div class="input-group">
+                    <label>Full Name</label>
+                    <input type="text" id="reg-name" required>
+                </div>
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="reg-email" required>
+                </div>
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="reg-password" required>
+                </div>
+                <div class="error-msg" id="reg-error"></div>
+                <button type="submit" class="submit-btn" id="reg-submit">Register <div class="spinner loader"></div></button>
+            </form>
+        </div>
+    </div>
+
+    <!-- DASHBOARD VIEW -->
+    <div class="app-container hidden" id="app-container">
+
+        <!-- Navbar -->
+        <nav class="glass-panel navbar">
+            <h2 id="nav-logo">Tele Patient System</h2>
+            <button class="nav-hamburger" id="nav-hamburger" onclick="toggleNavMenu()" aria-label="Menu">
+                <span></span><span></span><span></span>
+            </button>
+            <div class="nav-links" id="nav-links">
+                <button class="nav-btn" onclick="handleLaunchpadClick()">&#128640; LaunchPad</button>
+                <button class="nav-btn" onclick="openModal('social-modal')">&#128241; Social Feed</button>
+                <!-- Notification Bell -->
+                <div class="notif-wrap" id="notif-wrap" style="display:none;position:relative;">
+                    <button class="nav-btn" onclick="toggleNotifPanel()" style="position:relative;padding:8px 10px;" title="Notifications">
+                        🔔
+                        <span id="notif-badge" style="display:none;position:absolute;top:4px;right:4px;background:#ef4444;color:white;font-size:0.6rem;font-weight:700;min-width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;line-height:1;">0</span>
+                    </button>
+                    <div id="notif-panel" style="display:none;position:absolute;right:0;top:calc(100% + 8px);width:320px;max-height:420px;overflow-y:auto;background:white;border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,0.12);z-index:2000;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border);">
+                            <span style="font-weight:700;font-size:0.95rem;">🔔 Notifications</span>
+                            <button onclick="markAllNotifRead()" style="background:none;border:none;color:var(--primary);font-size:0.78rem;font-weight:600;cursor:pointer;">Mark all read</button>
+                        </div>
+                        <div id="notif-list" style="padding:8px 0;"></div>
+                    </div>
+                </div>
+                <!-- Emergency Bell (MD only) -->
+                <div class="notif-wrap" id="emergency-bell-wrap" style="display:none;position:relative;">
+                    <button class="nav-btn" onclick="toggleEmergencyPanel()" style="position:relative;padding:8px 10px;" title="Emergency Alerts">
+                        🚨
+                        <span id="emergency-badge" style="display:none;position:absolute;top:4px;right:4px;background:#ef4444;color:white;font-size:0.6rem;font-weight:700;min-width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;line-height:1;animation:blink 1s infinite;">0</span>
+                    </button>
+                    <div id="emergency-panel" style="display:none;position:absolute;right:0;top:calc(100% + 8px);width:340px;max-height:460px;overflow-y:auto;background:white;border:1px solid #fecaca;border-radius:14px;box-shadow:0 10px 30px rgba(239,68,68,0.15);z-index:2000;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid #fecaca;background:#fef2f2;border-radius:14px 14px 0 0;">
+                            <span style="font-weight:700;font-size:0.95rem;color:#dc2626;">🚨 Emergency Alerts</span>
+                            <button onclick="acknowledgeAllEmergencies()" style="background:none;border:none;color:#dc2626;font-size:0.78rem;font-weight:600;cursor:pointer;">Ack All</button>
+                        </div>
+                        <div id="md-emergency-queue" style="padding:8px;">
+                            <p class="text-muted" style="padding:12px;text-align:center;font-size:0.85rem;">No active emergencies.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="user-badge" id="user-badge">User Name</div>
+                <button class="nav-btn danger" onclick="logout()">Logout</button>
+            </div>
+        </nav>
+
+        <!-- EMERGENCY ALERT BAR (MD only, shown when active emergencies exist) -->
+        <div id="emergency-alert-bar" style="display:none;width:100%;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;padding:12px 24px;border-radius:12px;margin-bottom:16px;cursor:pointer;box-shadow:0 4px 16px rgba(239,68,68,0.35);animation:blink-border 1.5s infinite;" onclick="toggleEmergencyPanel()">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <span style="font-size:1.4rem;animation:pulse-red 1.5s infinite;">🚨</span>
+                    <div>
+                        <div style="font-weight:800;font-size:1rem;letter-spacing:0.3px;">EMERGENCY ALERT ACTIVE</div>
+                        <div id="emergency-bar-detail" style="font-size:0.82rem;opacity:0.9;margin-top:2px;">Loading...</div>
+                    </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span id="emergency-bar-count" style="background:white;color:#dc2626;font-weight:800;font-size:0.9rem;padding:4px 14px;border-radius:20px;">0 Active</span>
+                    <span style="font-size:0.82rem;opacity:0.85;font-weight:600;">Click to manage →</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-content">
+
+            <!-- MAIN DOCTOR DASHBOARD -->
+            <div id="md-dashboard" class="role-view hidden">
+                <h2>Hospital Analytics Dashboard</h2>
+
+                <div class="analytics-grid">
+                    <div class="metric-card glass-panel">
+                        <h3>Patient Count</h3>
+                        <div class="metric-value"><span id="md-patients">0</span></div>
+                    </div>
+                    <div class="metric-card glass-panel">
+                        <h3>Appointments</h3>
+                        <div class="metric-value"><span id="md-appointments-count">0</span></div>
+                    </div>
+                    <div class="metric-card glass-panel">
+                        <h3>Pending Referrals</h3>
+                        <div class="metric-value"><span id="md-pending-refs">0</span></div>
+                    </div>
+                    <div class="metric-card glass-panel">
+                        <h3>Pending Tokens</h3>
+                        <div class="metric-value"><span id="md-pending-tokens">0</span></div>
+                    </div>
+                    <!-- Live Emergency Alert Card -->
+                    <div class="metric-card glass-panel" style="border:1.5px solid #fecaca;background:#fef2f2;cursor:pointer;" onclick="toggleEmergencyPanel()">
+                        <h3 style="color:#dc2626;">🚨 Active Emergencies</h3>
+                        <div class="metric-value" id="md-emergency-count" style="background:linear-gradient(135deg,#ef4444,#dc2626);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">0</div>
+                    </div>
+                </div>
+
+                <!-- Doctor Activity -->
+                <h3 style="margin-bottom:10px;">Doctor Activity</h3>
+                <div class="list-container glass-panel" id="md-activity" style="margin-bottom:25px;">
+                    <p class="text-muted">No activity yet.</p>
+                </div>
+
+                <div class="md-actions">
+                    <div class="action-group glass-panel">
+                        <div class="action-group-title">&#9881;&#65039; Actions</div>
+                        <div class="action-btns">
+                            <button class="submit-btn" onclick="openModal('finance-modal')">&#43; Finance Record</button>
+                            <button class="submit-btn outline" onclick="openModal('post-social-modal')">&#128241; Social Feed</button>
+                            <button class="submit-btn outline" onclick="openModal('promote-modal')">&#128100; Manage Roles</button>
+                            <button class="submit-btn outline" onclick="loadMDDashboard(); loadMDQueues();">&#8635; Refresh</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hospital Directory -->
+                <h3>Hospital Directory</h3>
+                <div class="list-container glass-panel" id="md-directory-list" style="margin-bottom:25px;">
+                    <p class="text-muted">Loading Directory...</p>
+                </div>
+
+                <!-- Direct Assignment -->
+                <h3>Direct Patient Assignment to Doctor</h3>
+                <div class="list-container glass-panel" style="margin-bottom:25px; border-left:4px solid var(--primary);">
+                    <p class="text-muted" style="margin-bottom:15px;">Manually assign any patient to any doctor.</p>
+                    <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:10px; align-items:end;">
+                        <div>
+                            <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:5px;">Select Patient</label>
+                            <select id="md-assign-patient" class="modal-input" style="margin:0;"></select>
+                        </div>
+                        <div>
+                            <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:5px;">Assign To Doctor</label>
+                            <select id="md-assign-doctor" class="modal-input" style="margin:0;"></select>
+                        </div>
+                        <button class="submit-btn" style="width:auto;padding:12px 24px;margin:0;" onclick="executeDirectAssignment()">Assign Now</button>
+                    </div>
+                </div>
+
+                <!-- Active Sessions -->
+                <h3>Active Approved Sessions</h3>
+                <div class="list-container glass-panel" id="md-appointments" style="margin-bottom:25px;">
+                    <p class="text-muted">No active sessions.</p>
+                </div>
+
+                <!-- Pending Queues -->
+                <h3>Pending Referrals &amp; Token Requests</h3>
+                <div class="list-container glass-panel" id="md-queues">
+                    <p class="text-muted">Loading queues...</p>
+                </div>
+            </div>
+
+            <!-- DOCTOR DASHBOARD -->
+            <div id="doctor-dashboard" class="role-view hidden">
+
+                <!-- Stats Bar -->
+                <div class="doc-stats-bar" id="doc-stats-bar">
+                    <div class="doc-stat-card">
+                        <div class="doc-stat-value" id="doc-stat-total">0</div>
+                        <div class="doc-stat-label">Total Patients</div>
+                    </div>
+                    <div class="doc-stat-card">
+                        <div class="doc-stat-value" id="doc-stat-active">0</div>
+                        <div class="doc-stat-label">Active (Visited)</div>
+                    </div>
+                    <div class="doc-stat-card">
+                        <div class="doc-stat-value" id="doc-stat-referred">0</div>
+                        <div class="doc-stat-label">Referred</div>
+                    </div>
+                    <div class="doc-stat-card">
+                        <div class="doc-stat-value" id="doc-stat-nohistory">0</div>
+                        <div class="doc-stat-label">No History</div>
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="doc-controls glass-panel">
+                    <div class="doc-search-wrap">
+                        <span class="doc-search-icon">🔍</span>
+                        <input type="text" id="doc-search" class="doc-search-input" placeholder="Search patient name..." oninput="applyDoctorFilters()">
+                    </div>
+                    <div class="doc-filter-group">
+                        <label>Status</label>
+                        <select id="doc-filter-status" class="modal-input" style="margin:0;min-width:140px;" onchange="applyDoctorFilters()">
+                            <option value="all">All Patients</option>
+                            <option value="active">Active (Visited)</option>
+                            <option value="referred">Referred</option>
+                            <option value="nohistory">No History</option>
+                        </select>
+                    </div>
+                    <div class="doc-filter-group">
+                        <label>Sort By</label>
+                        <select id="doc-sort" class="modal-input" style="margin:0;min-width:150px;" onchange="applyDoctorFilters()">
+                            <option value="latest">Latest Visit</option>
+                            <option value="oldest">Oldest Visit</option>
+                            <option value="name">Name (A–Z)</option>
+                        </select>
+                    </div>
+                    <button class="submit-btn outline" style="width:auto;padding:9px 16px;white-space:nowrap;" onclick="loadDoctorDashboard()">↺ Refresh</button>
+                    <button class="submit-btn" style="width:auto;padding:9px 16px;white-space:nowrap;" onclick="openModal('add-patient-doctor-modal')">➕ Add Patient</button>
+                </div>
+
+                <!-- Patient List -->
+                <div id="doctor-patients-list">
+                    <div class="doc-skeleton">
+                        <div class="skeleton-card"></div>
+                        <div class="skeleton-card"></div>
+                        <div class="skeleton-card"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PATIENT DASHBOARD -->
+            <div id="patient-dashboard" class="role-view hidden">
+
+                <div style="margin-top:0;margin-bottom:30px;">
+                    <h2 style="color:var(--accent-1);margin-bottom:14px;">Scheduled MD Appointments</h2>
+                    <div class="list-container glass-panel" id="patient-appointments">
+                        <p class="text-muted">No active appointments found.</p>
+                    </div>
+                </div>
+
+                <div class="flex-header">
+                    <h2>My Medical History</h2>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                        <button class="submit-btn outline" style="width:auto;padding:8px 16px;" onclick="openReports(currentUser.userId)">📋 My Reports</button>
+                        <button class="submit-btn outline" style="width:auto;padding:8px 16px;" onclick="exportHistoryPDF()">⬇ Export PDF</button>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="glass-panel" style="padding:16px 20px;margin-bottom:16px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+                    <div style="flex:1;min-width:160px;">
+                        <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:5px;">Search Doctor</label>
+                        <input type="text" id="filter-doctor" class="modal-input" style="margin:0;" placeholder="Doctor name..." oninput="applyHistoryFilters()">
+                    </div>
+                    <div style="flex:1;min-width:160px;">
+                        <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:5px;">Search Diagnosis</label>
+                        <input type="text" id="filter-diagnosis" class="modal-input" style="margin:0;" placeholder="Diagnosis keyword..." oninput="applyHistoryFilters()">
+                    </div>
+                    <div style="min-width:130px;">
+                        <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:5px;">From Date</label>
+                        <input type="date" id="filter-from" class="modal-input" style="margin:0;" onchange="applyHistoryFilters()">
+                    </div>
+                    <div style="min-width:140px;">
+                        <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:5px;">Sort By</label>
+                        <select id="filter-sort" class="modal-input" style="margin:0;" onchange="applyHistoryFilters()">
+                            <option value="latest">Latest First</option>
+                            <option value="oldest">Oldest First</option>
+                            <option value="doctor">Doctor Name</option>
+                        </select>
+                    </div>
+                    <button class="submit-btn outline" style="width:auto;padding:9px 16px;" onclick="clearHistoryFilters()">✕ Clear</button>
+                </div>
+
+                <!-- History Table -->
+                <div class="glass-panel" style="overflow-x:auto;margin-bottom:30px;">
+                    <table id="history-table" style="width:100%;border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:var(--primary);color:white;">
+                                <th style="padding:12px 14px;text-align:left;font-size:0.8rem;font-weight:700;letter-spacing:0.5px;white-space:nowrap;">DATE</th>
+                                <th style="padding:12px 14px;text-align:left;font-size:0.8rem;font-weight:700;letter-spacing:0.5px;">DOCTOR</th>
+                                <th style="padding:12px 14px;text-align:left;font-size:0.8rem;font-weight:700;letter-spacing:0.5px;">DIAGNOSIS</th>
+                                <th style="padding:12px 14px;text-align:left;font-size:0.8rem;font-weight:700;letter-spacing:0.5px;">PRESCRIPTION (Rx)</th>
+                                <th style="padding:12px 14px;text-align:left;font-size:0.8rem;font-weight:700;letter-spacing:0.5px;">STATUS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body">
+                            <tr><td colspan="5" style="padding:24px;text-align:center;color:var(--text-muted);">Loading history...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- VIDEO CALL MODAL -->
+    <div id="video-modal" class="modal">
+        <div class="modal-content glass-panel" style="width:700px;max-width:95vw;padding:20px;">
+            <div class="flex-header" style="border-bottom:1px solid var(--glass-border);padding-bottom:15px;margin-bottom:15px;">
+                <h2 style="margin:0;">📹 Video Consultation</h2>
+                <div id="video-schedule" style="font-size:0.85rem;color:var(--accent-1);font-weight:bold;"></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-bottom:15px;">
+                <div style="position:relative;">
+                    <video id="local-video" autoplay muted playsinline style="width:100%;border-radius:12px;background:#000;min-height:200px;"></video>
+                    <span style="position:absolute;bottom:8px;left:10px;font-size:0.75rem;background:rgba(0,0,0,0.6);padding:3px 8px;border-radius:8px;">You</span>
+                </div>
+                <div style="position:relative;">
+                    <video id="remote-video" autoplay playsinline style="width:100%;border-radius:12px;background:#111;min-height:200px;"></video>
+                    <span style="position:absolute;bottom:8px;left:10px;font-size:0.75rem;background:rgba(0,0,0,0.6);padding:3px 8px;border-radius:8px;">Remote</span>
+                    <div id="remote-placeholder" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:0.9rem;border-radius:12px;background:#111;">Waiting for other party...</div>
+                </div>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:center;">
+                <button class="submit-btn danger hidden" id="video-terminate-btn" style="width:auto;padding:10px 20px;margin:0;" onclick="terminateVideoSession()">Terminate</button>
+                <button class="submit-btn outline" style="width:auto;padding:10px 20px;margin:0;" onclick="closeVideoCall()">Leave Call</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHAT MODAL -->
+    <div id="chat-modal" class="modal">
+        <div class="modal-content glass-panel" style="width:600px;height:80vh;display:flex;flex-direction:column;padding:20px;">
+            <div class="flex-header" style="border-bottom:1px solid var(--glass-border);padding-bottom:15px;margin-bottom:0;">
+                <h2 id="chat-title" style="margin:0;">Live Consultation</h2>
+                <div id="chat-schedule" style="font-size:0.85rem;color:var(--accent-1);font-weight:bold;"></div>
+            </div>
+            <div id="chat-messages" style="flex:1;overflow-y:auto;padding:15px 0;display:flex;flex-direction:column;gap:10px;"></div>
+            <div style="display:flex;gap:10px;margin-top:15px;">
+                <input type="text" id="chat-input" class="modal-input" style="margin:0;flex:1;" placeholder="Type secure message..." onkeypress="if(event.key==='Enter') sendChatMessage()">
+                <button class="submit-btn" style="width:auto;padding:0 25px;" onclick="sendChatMessage()">Send</button>
+                <button class="submit-btn danger hidden" id="chat-terminate-btn" style="width:auto;padding:0 15px;margin:0;" onclick="terminateSession()">Terminate</button>
+                <button class="submit-btn outline" style="width:auto;padding:0 15px;margin:0;" onclick="closeChat()">Exit</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCHEDULE SESSION MODAL -->
+    <div id="md-assign-modal" class="modal">
+        <div class="modal-content glass-panel">
+            <h2>Schedule Session</h2>
+            <p class="text-muted" style="margin-bottom:15px;font-size:0.85rem;">Select date and time for the session.</p>
+            <input type="hidden" id="assign-token-id">
+            <input type="datetime-local" id="assign-time" class="modal-input" required>
+            <button class="submit-btn" onclick="submitTokenApproval()">Approve &amp; Schedule</button>
+            <button class="submit-btn outline mt-2" onclick="closeModal('md-assign-modal')">Cancel</button>
+        </div>
+    </div>
+
+    <!-- LAUNCHPAD MODAL -->
+    <div id="launchpad-modal" class="modal">
+        <div class="modal-content glass-panel">
+            <h2>LaunchPad - Submit Idea</h2>
+            <input type="text" id="lp-title" placeholder="Idea Title *" class="modal-input">
+            <textarea id="lp-desc" placeholder="Describe your idea... *" class="modal-input" rows="4"></textarea>
+            <input type="text" id="lp-domain" placeholder="Domain (e.g. AI, Health, Tech)" class="modal-input">
+            <input type="text" id="lp-contact" placeholder="Contact Info (Phone / Email)" class="modal-input">
+            <button class="submit-btn" onclick="submitLaunchpad()">Submit Idea</button>
+            <button class="submit-btn outline mt-2" onclick="closeModal('launchpad-modal')">Close</button>
+        </div>
+    </div>
+
+    <!-- MD LAUNCHPAD VIEW MODAL -->
+    <div id="md-launchpad-modal" class="modal">
+        <div class="modal-content glass-panel" style="width:500px;max-height:80vh;overflow-y:auto;">
+            <h2>Submitted Ideas</h2>
+            <div id="md-launchpad-feed">Loading...</div>
+            <button class="submit-btn outline mt-2" onclick="closeModal('md-launchpad-modal')">Close</button>
+        </div>
+    </div>
+
+    <!-- PROMOTE MODAL -->
+    <div id="promote-modal" class="modal">
+        <div class="modal-content glass-panel">
+            <h2>Role Management</h2>
+            <p class="text-muted" style="font-size:0.85rem;margin-bottom:15px;">Change role or create new user with temp@123 password.</p>
+            <input type="email" id="prom-email" placeholder="User Email" class="modal-input" required>
+            <input type="text" id="prom-name" placeholder="User Full Name" class="modal-input" required>
+            <select id="prom-role" class="modal-input">
+                <option value="PATIENT">Demote to Patient</option>
+                <option value="DOCTOR">Promote to Doctor</option>
+                <option value="MAIN_DOCTOR">Promote to Main Doctor</option>
+            </select>
+            <button class="submit-btn" onclick="submitPromote()">Execute Change</button>
+            <button class="submit-btn outline mt-2" onclick="closeModal('promote-modal')">Cancel</button>
+        </div>
+    </div>
+
+    <!-- SOCIAL FEED MODAL -->
+    <div id="social-modal" class="modal">
+        <div class="modal-content glass-panel" style="width:500px;max-height:80vh;overflow-y:auto;">
+            <h2>Hospital Updates</h2>
+            <div id="social-feed">Loading...</div>
+            <button class="submit-btn outline mt-2" onclick="closeModal('social-modal')">Close</button>
+        </div>
+    </div>
+
+    <!-- TOKEN REQUEST MODAL -->
+    <div id="token-modal" class="modal">
+        <div class="modal-content glass-panel">
+            <h2>Request MD Consultation</h2>
+            <p class="text-muted" style="margin-bottom:15px;font-size:0.85rem;">Select type and send request to Main Doctor for approval.</p>
+            <select id="token-type" class="modal-input">
+                <option value="CHAT">Chat Window</option>
+                <option value="VIDEO">Video Call</option>
+            </select>
+            <button class="submit-btn" onclick="requestToken()">Send Request to MD</button>
+            <button class="submit-btn outline mt-2" onclick="closeModal('token-modal')">Cancel</button>
+        </div>
+    </div>
+
+    <!-- CLINICAL NOTES MODAL -->
+    <div id="add-patient-modal" class="modal">
+        <div class="modal-content glass-panel">
+            <h2>Update Clinical Notes</h2>
+            <input type="hidden" id="consult-patient-id">
+            <p id="consult-patient-name" style="margin-bottom:10px;font-weight:bold;color:var(--primary);"></p>
+            <textarea id="consult-notes" placeholder="Diagnosis / Description (e.g. High Blood Pressure)" class="modal-input" rows="3" required></textarea>
+            <textarea id="consult-prescription" placeholder="Prescription / Advice" class="modal-input" rows="2" required></textarea>
+            <label style="font-size:0.85rem;color:var(--text-muted);margin-bottom:5px;display:block;">Upload Report File (PDF, Image)</label>
+            <input type="file" id="consult-report-file" accept=".pdf,.jpg,.jpeg,.png" class="modal-input" style="padding:8px;" onchange="handleFileSelect()">
+            <small class="text-muted" style="display:block;margin-bottom:8px;">Or paste a direct URL:</small>
+            <input type="text" id="consult-report" placeholder="Report URL (optional)" class="modal-input">
+            <div id="upload-status" style="font-size:0.8rem;color:var(--accent-1);margin-bottom:10px;"></div>
+            <button class="submit-btn" onclick="addConsultation()">Save Clinical Record</button>
+            <button class="submit-btn outline mt-2" onclick="closeModal('add-patient-modal')">Cancel</button>
+        </div>
+    </div>
+
+    <!-- REFERRAL MODAL -->
+    <div id="refer-modal" class="modal">
+        <div class="modal-content glass-panel">
+            <h2>Request Referral (Goes to MD)</h2>
+            <input type="hidden" id="ref-patient-id">
+            <p id="ref-patient-name" style="margin-bottom:10px;font-weight:bold;color:var(--primary);"></p>
+            <textarea id="ref-reason" placeholder="Reason for referral..." class="modal-input" rows="3" required></textarea>
+            <select id="ref-specialty" class="modal-input">
+                <option value="Cardiology">Cardiology</option>
+                <option value="Radiology">Radiology</option>
+                <option value="Orthopedics">Orthopedics</option>
+                <option value="Neurology">Neurology</option>
+                <option value="General Practice">General Practice</option>
+            </select>
+            <select id="ref-urgency" class="modal-input">
+                <option value="Low">Low Urgency</option>
+                <option value="Medium" selected>Medium Urgency</option>
+                <option value="High">High Urgency</option>
+            </select>
+            <p class="text-muted" style="font-size:0.8rem;margin:10px 0;">Patient stays with you until MD approves the transfer.</p>
+            <button class="submit-btn" onclick="sendReferral()">Submit to MD</button>
+            <button class="submit-btn outline mt-2" onclick="closeModal('refer-modal')">Cancel</button>
+        </div>
+    </div>
+
+    <!-- POST SOCIAL MODAL -->
+    <div id="post-social-modal" class="modal">
+        <div class="modal-content glass-panel">
+            <h2>Broadcast to Hospital</h2>
+            <input type="text" id="ps-title" placeholder="Title" class="modal-input">
+            <textarea id="ps-content" placeholder="Content (Text, Links, etc)" class="modal-input" rows="4"></textarea>
+            <input type="text" id="ps-media" placeholder="Media URL (YouTube link, Image URL - optional)" class="modal-input">
+            <button class="submit-btn" onclick="postSocial()">Publish Broadcast</button>
+            <button class="submit-btn outline mt-2" onclick="closeModal('post-social-modal')">Cancel</button>
+        </div>
+    </div>
+
+    <!-- MD DOCTOR INSPECT MODAL -->
+    <div id="md-doctor-inspect-modal" class="modal">
+        <div class="modal-content glass-panel" style="width:500px;max-height:80vh;overflow-y:auto;">
+            <h2 id="inspect-doc-name">Doctor Details</h2>
+            <p class="text-muted" style="font-size:0.85rem;margin-bottom:15px;">Patients governed by this doctor.</p>
+            <div id="inspect-doc-patients">Loading...</div>
+            <button class="submit-btn outline mt-2" onclick="closeModal('md-doctor-inspect-modal')">Close</button>
+        </div>
+    </div>
+
+    <!-- MD PATIENT INSPECT MODAL -->
+    <div id="md-patient-inspect-modal" class="modal">
+        <div class="modal-content glass-panel" style="width:600px;max-height:80vh;overflow-y:auto;border-top:4px solid var(--accent-2);">
+            <h2 id="inspect-pat-name">Patient History</h2>
+            <div class="timeline" id="inspect-pat-timeline" style="margin-top:20px;">Loading...</div>
+            <button class="submit-btn outline mt-2" onclick="closeModal('md-patient-inspect-modal')">Close</button>
+        </div>
+    </div>
+
+    <!-- FINANCE MODAL -->
+    <div id="finance-modal" class="modal">
+        <div class="modal-content glass-panel">
+            <h2>Add Financial Record</h2>
+            <p class="text-muted" style="font-size:0.85rem;margin-bottom:15px;">Add revenue or expense to update dashboard analytics.</p>
+            <select id="finance-type" class="modal-input">
+                <option value="REVENUE">Revenue (Income - e.g. Consultation Fee)</option>
+                <option value="EXPENDITURE">Expenditure (Expense - e.g. Equipment, Salary)</option>
+            </select>
+            <input type="number" id="finance-amount" placeholder="Amount (Rs.)" class="modal-input" min="1">
+            <input type="text" id="finance-desc" placeholder="Description (e.g. Consultation Fee, Equipment Purchase)" class="modal-input">
+            <button class="submit-btn" onclick="addFinancialRecord()">Add Record</button>
+            <button class="submit-btn outline mt-2" onclick="closeModal('finance-modal')">Cancel</button>
+        </div>
+    </div>
+
+    <!-- REPORTS MODAL (Patient & Doctor) -->
+    <div id="reports-modal" class="modal">
+        <div class="modal-content glass-panel" style="width:640px;max-width:95vw;max-height:85vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+                <h2 style="margin:0;">📋 Medical Reports</h2>
+                <button class="submit-btn outline" style="width:auto;padding:6px 14px;margin:0;" onclick="closeModal('reports-modal')">✕ Close</button>
+            </div>
+            <div id="reports-list"><p class="text-muted">Loading reports...</p></div>
+        </div>
+    </div>
+
+    <!-- REPORT VIEWER MODAL (reused for both uploaded reports & history) -->
+    <div id="report-viewer-modal" class="modal">
+        <div class="modal-content glass-panel" style="width:700px;max-width:95vw;max-height:90vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border);">
+                <h2 id="report-viewer-title" style="margin:0;font-size:1.15rem;"></h2>
+                <button class="submit-btn outline" style="width:auto;padding:6px 14px;margin:0;" onclick="closeModal('report-viewer-modal')">✕ Close</button>
+            </div>
+            <!-- Meta info row -->
+            <div id="report-viewer-meta" style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:16px;font-size:0.85rem;color:var(--text-muted);"></div>
+            <!-- Diagnosis / Rx (for history entries) -->
+            <div id="report-viewer-clinical" style="display:none;margin-bottom:16px;"></div>
+            <!-- File preview -->
+            <div id="report-viewer-content" style="min-height:200px;"></div>
+            <!-- Actions -->
+            <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
+                <button id="report-chat-btn" class="submit-btn outline" style="width:auto;padding:10px 20px;display:none;" onclick="sendReportToChat()">💬 Send in Chat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- UPLOAD REPORT MODAL (Doctor) -->
+    <div id="upload-report-modal" class="modal">
+        <div class="modal-content glass-panel">
+            <h2>📤 Upload Report</h2>
+            <input type="hidden" id="upload-report-patient-id">
+            <input type="text" id="upload-report-name" placeholder="Report Name (e.g. Blood Test, X-Ray)" class="modal-input">
+            <select id="upload-report-type" class="modal-input">
+                <option value="PDF">📄 PDF</option>
+                <option value="IMAGE">🖼 Image</option>
+                <option value="TEXT">📝 Text / Notes</option>
+            </select>
+            <input type="text" id="upload-report-url" placeholder="File URL or paste base64 link" class="modal-input">
+            <input type="file" id="upload-report-file" accept=".pdf,.jpg,.jpeg,.png" class="modal-input" style="padding:8px;" onchange="handleReportFileSelect()">
+            <textarea id="upload-report-notes" placeholder="Additional notes (optional)" class="modal-input" rows="2"></textarea>
+            <div id="upload-report-status" style="font-size:0.8rem;color:var(--primary);margin-bottom:8px;"></div>
+            <button class="submit-btn" onclick="submitReportUpload()">Upload Report</button>
+            <button class="submit-btn outline mt-2" onclick="closeModal('upload-report-modal')">Cancel</button>
+        </div>
+    </div>
+
+    <!-- ADD PATIENT MODAL (Doctor) -->
+    <div id="add-patient-doctor-modal" class="modal">
+        <div class="modal-content glass-panel">
+            <h2>➕ Add New Patient</h2>
+            <p class="text-muted" style="margin-bottom:16px;font-size:0.85rem;">Patient will be registered and assigned to you with password <strong>temp@123</strong>.</p>
+            <input type="text" id="ap-name" placeholder="Full Name *" class="modal-input" required>
+            <input type="email" id="ap-email" placeholder="Email Address *" class="modal-input" required>
+            <input type="number" id="ap-age" placeholder="Age (optional)" class="modal-input" min="1" max="120">
+            <textarea id="ap-note" placeholder="Initial medical note (optional)" class="modal-input" rows="2"></textarea>
+            <div id="ap-error" style="color:var(--danger);font-size:0.83rem;margin-bottom:8px;"></div>
+            <button class="submit-btn" onclick="submitAddPatient()">Add Patient</button>
+            <button class="submit-btn outline mt-2" onclick="closeModal('add-patient-doctor-modal')">Cancel</button>
+        </div>
+    </div>
+
+    <!-- FLOATING EMERGENCY BUTTON (Patient only) -->
+    <div id="emergency-fab" style="display:none;position:fixed;bottom:95px;right:25px;z-index:9998;">
+        <button onclick="openModal('emergency-modal')" title="Emergency Alert"
+            style="width:52px;height:52px;border-radius:50%;border:none;background:linear-gradient(135deg,#ef4444,#b91c1c);color:white;font-size:1.4rem;cursor:pointer;box-shadow:0 4px 18px rgba(239,68,68,0.6);animation:pulse-red 2s infinite;display:flex;align-items:center;justify-content:center;">
+            🚨
+        </button>
+    </div>
+
+    <!-- EMERGENCY MODAL -->
+    <div id="emergency-modal" class="modal">
+        <div class="modal-content glass-panel" style="border-top:4px solid #ef4444;max-width:400px;">
+            <h2 style="color:#fca5a5;">🚨 Emergency Alert</h2>
+            <p class="text-muted" style="margin-bottom:18px;font-size:0.88rem;">Select alert level and send to hospital counter immediately.</p>
+            <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px;">
+                <button onclick="triggerEmergencyCall('CRITICAL')"
+                    style="padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,#ef4444,#b91c1c);color:white;font-weight:700;font-size:0.95rem;cursor:pointer;display:flex;align-items:center;gap:10px;">
+                    🔴 Critical Emergency — Need help NOW
+                </button>
+                <button onclick="triggerEmergencyCall('URGENT')"
+                    style="padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,#f59e0b,#d97706);color:white;font-weight:700;font-size:0.95rem;cursor:pointer;display:flex;align-items:center;gap:10px;">
+                    🟡 Urgent — Need assistance soon
+                </button>
+                <button onclick="triggerEmergencyCall('NORMAL')"
+                    style="padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,#22c55e,#16a34a);color:white;font-weight:700;font-size:0.95rem;cursor:pointer;display:flex;align-items:center;gap:10px;">
+                    🟢 Normal — General assistance needed
+                </button>
+            </div>
+            <button class="submit-btn outline mt-2" onclick="closeModal('emergency-modal')">Cancel</button>
+        </div>
+    </div>
+
+    <!-- CHATBOT WIDGET -->
+    <div id="chatbot-widget" style="position:fixed;bottom:25px;right:25px;z-index:9999;">
+        <button onclick="toggleChatbot()" title="TelePatient Assistant"
+            style="width:58px;height:58px;border-radius:50%;border:2px solid #bfdbfe;background:white;font-size:1.8rem;cursor:pointer;box-shadow:0 4px 18px rgba(59,130,246,0.25);display:flex;align-items:center;justify-content:center;transition:transform 0.2s,box-shadow 0.2s;"
+            onmouseover="this.style.transform='scale(1.1)';this.style.boxShadow='0 6px 24px rgba(59,130,246,0.35)'"
+            onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 4px 18px rgba(59,130,246,0.25)'">
+            👩‍⚕️
+        </button>
+    </div>
+
+    <div id="chatbot-box" class="glass-panel hidden" style="position:fixed;bottom:95px;right:25px;width:320px;height:420px;z-index:9999;display:flex;flex-direction:column;padding:0;overflow:hidden;">
+        <div style="padding:14px 18px;background:linear-gradient(135deg,var(--primary),var(--green));display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span style="font-size:1.6rem;background:white;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">👩‍⚕️</span>
+                <div>
+                    <h4 style="margin:0;color:white;font-size:0.95rem;">TelePatient Assistant</h4>
+                    <small style="color:rgba(255,255,255,0.85);font-size:0.75rem;">Ask me anything about the system</small>
+                </div>
+            </div>
+            <button onclick="toggleChatbot()" style="background:rgba(255,255,255,0.2);border:none;color:white;font-size:1rem;cursor:pointer;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;">✕</button>
+        </div>
+        <div id="chatbot-messages" style="flex:1;overflow-y:auto;padding:15px;display:flex;flex-direction:column;gap:10px;background:#f8fafc;"></div>
+        <div style="padding:10px;border-top:1px solid var(--border);display:flex;gap:8px;background:white;">
+            <input type="text" id="chatbot-input" placeholder="Type your question..." class="modal-input" style="margin:0;flex:1;padding:10px;" onkeypress="if(event.key==='Enter') sendChatbotMessage()">
+            <button onclick="sendChatbotMessage()" class="submit-btn" style="width:auto;padding:0 15px;margin:0;">Send</button>
+        </div>
+    </div>
+
+    <!-- EMERGENCY TOAST CONTAINER -->
+    <div id="emergency-toast-container" style="position:fixed;top:80px;right:20px;z-index:9997;display:flex;flex-direction:column;gap:10px;pointer-events:none;"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

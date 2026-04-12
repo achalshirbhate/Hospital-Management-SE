@@ -31,5 +31,4 @@ public class User {
 
     private String specialty;
     private String resetOtp;
-    private java.time.LocalDateTime otpExpiry;
 }

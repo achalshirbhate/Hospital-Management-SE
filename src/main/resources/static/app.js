@@ -70,13 +70,12 @@ document.getElementById('forgot-form').addEventListener('submit', async (e) => {
     const otpGroup = document.getElementById('otp-group');
     if (otpGroup.classList.contains('hidden')) {
         try {
-            const res = await fetch(`${API_BASE}/auth/forgot-password?email=${encodeURIComponent(email)}`, { method: 'POST' });
-            if (!res.ok) throw new Error('Email not found or failed to send.');
-            alert("✅ OTP sent to your registered email: " + email + "\nPlease check your inbox (and spam folder).");
+            await fetch(`${API_BASE}/auth/forgot-password?email=${encodeURIComponent(email)}`, { method: 'POST' });
+            alert("OTP generated. Check the Spring Boot Console for the Mock OTP.");
             otpGroup.classList.remove('hidden');
             document.getElementById('forgot-email').readOnly = true;
             btn.innerText = 'Confirm New Password';
-        } catch(err) { alert('Failed: ' + err.message); }
+        } catch(err) { alert('Failed to trigger process'); }
     } else {
         const otp = document.getElementById('forgot-otp').value;
         const newPwd = document.getElementById('forgot-new-pwd').value;
