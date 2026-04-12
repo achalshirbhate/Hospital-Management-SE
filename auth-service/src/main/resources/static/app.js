@@ -600,6 +600,34 @@ function downloadReport(type, format) {
     document.body.removeChild(a);
 }
 
+function downloadMedicalReport(report) {
+    if (!report || !report.fileUrl) return alert('File not available.');
+    const url  = report.fileUrl;
+    const name = report.reportName || 'report';
+    if (url.startsWith('data:')) {
+        const [meta, base64] = url.split(',');
+        const mime   = meta.match(/:(.*?);/)[1];
+        const binary = atob(base64);
+        const arr    = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
+        const blob = new Blob([arr], { type: mime });
+        const ext  = mime.includes('pdf') ? '.pdf' : mime.includes('png') ? '.png' : '.jpg';
+        const a    = document.createElement('a');
+        a.href     = URL.createObjectURL(blob);
+        a.download = name + ext;
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+    } else {
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = name;
+        a.target   = '_blank';
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a);
+    }
+}
+
 async function postSocial() {
     const title = document.getElementById('ps-title').value;
     const content = document.getElementById('ps-content').value;
@@ -1074,14 +1102,35 @@ async function loadSocialFeed() {
                     mediaHtml = `<a href="${post.mediaUrl}" target="_blank" style="color:var(--accent-1);display:block;margin-top:6px;">🔗 ${post.mediaUrl}</a>`;
                 }
             }
-            feed.innerHTML += `<div class="social-post">
-                <small style="color:var(--primary);">${new Date(post.postedAt).toLocaleString()}</small>
+            const authorId = post.author?.id;
+            const canDelete = currentUser && (currentUser.role === 'MAIN_DOCTOR' || currentUser.userId === authorId);
+            const deleteBtn = canDelete
+                ? `<button onclick="deleteSocialPost(${post.id},this)" title="Delete"
+                    style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:1rem;padding:4px 6px;border-radius:6px;line-height:1;"
+                    onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='none'">🗑</button>`
+                : '';
+            feed.innerHTML += `<div class="social-post" id="social-post-${post.id}" style="position:relative;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <small style="color:var(--primary);">${new Date(post.postedAt).toLocaleString()}</small>
+                    ${deleteBtn}
+                </div>
                 <h4>${post.title}</h4>
                 <p>${post.content}</p>
                 ${mediaHtml}
             </div>`;
         });
     } catch(e) {}
+}
+
+async function deleteSocialPost(postId, btn) {
+    if (!confirm('Are you sure you want to delete this post?')) return;
+    btn.disabled = true;
+    try {
+        const res = await fetch(`${API_BASE}/shared/social/${postId}?requesterId=${currentUser.userId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error(await res.text());
+        const el = document.getElementById(`social-post-${postId}`);
+        if (el) { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; setTimeout(() => el.remove(), 300); }
+    } catch(e) { alert('Failed: ' + e.message); btn.disabled = false; }
 }
 
 // FIX 5 & 6: Launchpad visible for all roles, MD sees submissions, others see submit form
@@ -1096,13 +1145,18 @@ async function handleLaunchpadClick() {
             feed.innerHTML = '';
             if (data.length === 0) { feed.innerHTML = '<p class="text-muted">No ideas received.</p>'; return; }
             data.forEach(idea => {
-                feed.innerHTML += `<div class="card" style="margin-bottom:10px;">
-                    <small>Domain: ${idea.domain}</small>
+                feed.innerHTML += `<div class="card" id="idea-card-${idea.id}" style="margin-bottom:10px;position:relative;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <small style="color:var(--text-muted);">Domain: ${idea.domain || '—'}</small>
+                        <button onclick="deleteLaunchpadIdea(${idea.id},this)" title="Delete"
+                            style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:1rem;padding:4px 6px;border-radius:6px;line-height:1;"
+                            onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='none'">🗑</button>
+                    </div>
                     <h4 style="margin:5px 0;">${idea.ideaTitle}</h4>
                     <p>${idea.description}</p>
-                    <div style="background:var(--input-bg);padding:10px;border-radius:8px;margin-top:5px;">
+                    <div style="background:var(--bg-secondary);padding:10px;border-radius:8px;margin-top:5px;">
                         <small style="display:block;color:var(--primary);">Contact: ${idea.submitterEmail}</small>
-                        <small style="display:block;color:white;">Info: ${idea.contactInfo || 'N/A'}</small>
+                        <small style="display:block;color:var(--text-muted);">Info: ${idea.contactInfo || 'N/A'}</small>
                     </div>
                 </div>`;
             });
@@ -1110,6 +1164,17 @@ async function handleLaunchpadClick() {
     } else {
         openModal('launchpad-modal');
     }
+}
+
+async function deleteLaunchpadIdea(ideaId, btn) {
+    if (!confirm('Are you sure you want to delete this idea?')) return;
+    btn.disabled = true;
+    try {
+        const res = await fetch(`${API_BASE}/shared/launchpad/${ideaId}?requesterId=${currentUser.userId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error(await res.text());
+        const el = document.getElementById(`idea-card-${ideaId}`);
+        if (el) { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; setTimeout(() => el.remove(), 300); }
+    } catch(e) { alert('Failed: ' + e.message); btn.disabled = false; }
 }
 
 async function submitLaunchpad() {
@@ -1217,7 +1282,7 @@ async function openReports(patientId) {
                     </div>
                     <div style="display:flex;gap:8px;flex-wrap:wrap;">
                         <button class="submit-btn outline" style="width:auto;padding:6px 12px;font-size:0.82rem;" onclick="viewReport(${JSON.stringify(r).replace(/"/g,'&quot;')})">👁 View</button>
-                        <a href="${r.fileUrl}" target="_blank" class="submit-btn outline" style="width:auto;padding:6px 12px;font-size:0.82rem;text-decoration:none;">⬇ Download</a>
+                        <button class="submit-btn outline" style="width:auto;padding:6px 12px;font-size:0.82rem;" onclick="downloadMedicalReport(${JSON.stringify(r).replace(/"/g,'&quot;')})">⬇ Download</button>
                     </div>
                 </div>
             </div>`).join('');
@@ -1237,7 +1302,7 @@ function viewReport(report) {
         dlBtn.style.display = 'none';
     } else {
         dlBtn.style.display = 'flex';
-        dlBtn.onclick = () => downloadReport(report);
+        dlBtn.onclick = () => downloadMedicalReport(report);
         dlBtn.removeAttribute('href');
     }
 

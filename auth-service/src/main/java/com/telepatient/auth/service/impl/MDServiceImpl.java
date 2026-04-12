@@ -187,6 +187,7 @@ public class MDServiceImpl implements MDService {
         return launchpadRepo.findAll().stream()
                 .map(idea -> LaunchpadResponseDTO.builder()
                         .id(idea.getId())
+                        .submitterId(idea.getSubmitter().getId())
                         .submitterEmail(idea.getSubmitter().getEmail())
                         .ideaTitle(idea.getIdeaTitle())
                         .description(idea.getDescription())

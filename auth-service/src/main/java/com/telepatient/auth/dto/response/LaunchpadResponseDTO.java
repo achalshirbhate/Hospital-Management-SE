@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 @Builder
 public class LaunchpadResponseDTO {
     private Long id;
+    private Long submitterId;
     private String submitterEmail;
     private String ideaTitle;
     private String description;
