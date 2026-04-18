@@ -6,6 +6,9 @@ import '../../core/services/api_service.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/info_card.dart';
 import '../auth/login_screen.dart';
+import 'role_management_screen.dart';
+import 'launchpad_submissions_screen.dart';
+import '../shared/hospital_directory_screen.dart';
 
 class MDHome extends StatefulWidget {
   const MDHome({super.key});
@@ -27,6 +30,9 @@ class _MDHomeState extends State<MDHome> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _tab,
         onTap: (i) => setState(() => _tab = i),
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: AppColors.primary,
+        unselectedItemColor: AppColors.textMuted,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
           BottomNavigationBarItem(icon: Icon(Icons.queue), label: 'Queues'),
@@ -62,78 +68,186 @@ class _DashboardTabState extends State<_DashboardTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Hospital Analytics'),
-        actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _load)]),
+      appBar: AppBar(
+        title: const Text('Hospital Analytics Dashboard'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _load,
+            tooltip: 'Refresh Dashboard',
+          )
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(padding: const EdgeInsets.all(16), children: [
-                GridView.count(crossAxisCount: 2, shrinkWrap: true,
+                // Metrics Grid - Only 5 cards (NO FINANCIAL METRICS)
+                GridView.count(
+                  crossAxisCount: 2,
+                  shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.4,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 1.4,
                   children: [
-                    InfoCard(title: 'Total Revenue', value: '₹${_data['totalRevenue'] ?? 0}', icon: Icons.currency_rupee, color: AppColors.success),
-                    InfoCard(title: 'Total Expenses', value: '₹${_data['totalExpenses'] ?? 0}', icon: Icons.money_off, color: AppColors.danger),
-                    InfoCard(title: 'Profit / Loss', value: '₹${_data['profitLoss'] ?? 0}', icon: Icons.trending_up, color: AppColors.primary),
-                    InfoCard(title: 'Patients', value: '${_data['patientCount'] ?? 0}', icon: Icons.people, color: AppColors.cyan),
-                    InfoCard(title: 'Appointments', value: '${_data['totalAppointments'] ?? 0}', icon: Icons.calendar_today, color: AppColors.warning),
-                    InfoCard(title: 'Pending Referrals', value: '${_data['pendingReferrals'] ?? 0}', icon: Icons.swap_horiz, color: AppColors.primary),
+                    InfoCard(
+                      title: 'Patient Count',
+                      value: '${_data['patientCount'] ?? 0}',
+                      icon: Icons.people,
+                      color: AppColors.primary,
+                    ),
+                    InfoCard(
+                      title: 'Appointments',
+                      value: '${_data['totalAppointments'] ?? 0}',
+                      icon: Icons.calendar_today,
+                      color: AppColors.cyan,
+                    ),
+                    InfoCard(
+                      title: 'Pending Referrals',
+                      value: '${_data['pendingReferrals'] ?? 0}',
+                      icon: Icons.swap_horiz,
+                      color: AppColors.warning,
+                    ),
+                    InfoCard(
+                      title: 'Pending Tokens',
+                      value: '${_data['pendingTokens'] ?? 0}',
+                      icon: Icons.confirmation_number,
+                      color: AppColors.primary,
+                    ),
+                    // Emergency Alert Card
+                    InfoCard(
+                      title: '🚨 Active Emergencies',
+                      value: '${_data['activeEmergencies'] ?? 0}',
+                      icon: Icons.emergency,
+                      color: AppColors.danger,
+                    ),
                   ],
                 ),
-                const SizedBox(height: 20),
-                const Text('Doctor Activity', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 10),
-                if (_data['doctorActivity'] != null)
-                  ...(_data['doctorActivity'] as Map<String, dynamic>).entries.map((e) =>
-                    Card(child: ListTile(
-                      leading: const CircleAvatar(backgroundColor: AppColors.primaryLight,
-                        child: Icon(Icons.person, color: AppColors.primary)),
-                      title: Text('Dr. ${e.key}'),
-                      trailing: Chip(label: Text('${e.value} consults'),
-                        backgroundColor: AppColors.greenLight,
-                        labelStyle: const TextStyle(color: AppColors.success, fontWeight: FontWeight.w600)),
-                    ))),
-                const SizedBox(height: 20),
-                AppButton(label: '+ Add Finance Record', icon: Icons.add,
-                  onPressed: () => _showFinanceDialog(context)),
+                
+                const SizedBox(height: 24),
+                
+                // Doctor Activity Section
+                const Text(
+                  'Doctor Activity',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 12),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: _data['doctorActivity'] != null && (_data['doctorActivity'] as Map).isNotEmpty
+                        ? Column(
+                            children: (_data['doctorActivity'] as Map<String, dynamic>)
+                                .entries
+                                .map((e) => ListTile(
+                                      leading: const CircleAvatar(
+                                        backgroundColor: AppColors.primaryLight,
+                                        child: Icon(Icons.person, color: AppColors.primary),
+                                      ),
+                                      title: Text('Dr. ${e.key}'),
+                                      trailing: Chip(
+                                        label: Text('${e.value} consults'),
+                                        backgroundColor: AppColors.greenLight,
+                                        labelStyle: const TextStyle(
+                                          color: AppColors.success,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ))
+                                .toList(),
+                          )
+                        : const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Text(
+                              'No activity yet.',
+                              style: TextStyle(color: AppColors.textMuted),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                  ),
+                ),
+                
+                const SizedBox(height: 24),
+                
+                // Actions Section
+                const Text(
+                  '⚙️ Actions',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 12),
+                
+                AppButton(
+                  label: '👤 Manage User Roles',
+                  icon: Icons.admin_panel_settings,
+                  outline: true,
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const RoleManagementScreen()),
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+                
+                AppButton(
+                  label: '💡 View LaunchPad Ideas',
+                  icon: Icons.lightbulb,
+                  outline: true,
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LaunchpadSubmissionsScreen()),
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+                
+                AppButton(
+                  label: '🏥 Hospital Directory',
+                  icon: Icons.business,
+                  outline: true,
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const HospitalDirectoryScreen()),
+                    );
+                  },
+                ),
+                
+                const SizedBox(height: 24),
+                
+                // Active Sessions Section
+                const Text(
+                  'Active Approved Sessions',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 12),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: _data['activeSessions'] != null && (_data['activeSessions'] as List).isNotEmpty
+                        ? Column(
+                            children: (_data['activeSessions'] as List)
+                                .map((session) => ListTile(
+                                      leading: const Icon(Icons.video_call, color: AppColors.primary),
+                                      title: Text('${session['patientName']} - Dr. ${session['doctorName']}'),
+                                      subtitle: Text('Scheduled: ${session['scheduledTime']}'),
+                                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                                    ))
+                                .toList(),
+                          )
+                        : const Text(
+                            'No active sessions.',
+                            style: TextStyle(color: AppColors.textMuted),
+                            textAlign: TextAlign.center,
+                          ),
+                  ),
+                ),
               ]),
             ),
     );
-  }
-
-  void _showFinanceDialog(BuildContext context) {
-    String type = 'REVENUE';
-    final amountCtrl = TextEditingController();
-    final descCtrl   = TextEditingController();
-    showDialog(context: context, builder: (_) => AlertDialog(
-      title: const Text('Add Financial Record'),
-      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-        DropdownButtonFormField<String>(
-          value: type,
-          items: const [
-            DropdownMenuItem(value: 'REVENUE', child: Text('Revenue')),
-            DropdownMenuItem(value: 'EXPENDITURE', child: Text('Expenditure')),
-          ],
-          onChanged: (v) => type = v!,
-          decoration: const InputDecoration(labelText: 'Type'),
-        ),
-        const SizedBox(height: 12),
-        TextField(controller: amountCtrl, keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'Amount (₹)')),
-        const SizedBox(height: 12),
-        TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description')),
-      ])),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-        ElevatedButton(onPressed: () async {
-          await ApiService._client.post(Uri.parse(ApiConstants.mdFinance),
-            headers: {'Content-Type': 'application/json'},
-            body: '{"type":"$type","amount":${amountCtrl.text},"description":"${descCtrl.text}"}');
-          Navigator.pop(context); _load();
-        }, child: const Text('Add')),
-      ],
-    ));
   }
 }
 
@@ -165,8 +279,10 @@ class _QueuesTabState extends State<_QueuesTab> {
     final referrals = (_queues['referrals'] as List?) ?? [];
     final tokens    = (_queues['tokens']    as List?) ?? [];
     return Scaffold(
-      appBar: AppBar(title: const Text('Pending Queues'),
-        actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _load)]),
+      appBar: AppBar(
+        title: const Text('Pending Referrals & Token Requests'),
+        actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _load)],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -174,16 +290,16 @@ class _QueuesTabState extends State<_QueuesTab> {
               child: ListView(padding: const EdgeInsets.all(16), children: [
                 if (referrals.isEmpty && tokens.isEmpty)
                   const Center(child: Padding(padding: EdgeInsets.all(40),
-                    child: Text('No pending actions', style: TextStyle(color: AppColors.textMuted)))),
+                    child: Text('No pending actions', style: TextStyle(color: AppColors.textMuted, fontSize: 16)))),
                 if (referrals.isNotEmpty) ...[
-                  const Text('Referral Requests', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 8),
+                  const Text('Referral Requests', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 12),
                   ...referrals.map((r) => _ReferralCard(referral: r, doctors: _doctors, onDone: _load)),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                 ],
                 if (tokens.isNotEmpty) ...[
-                  const Text('Token Requests', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 8),
+                  const Text('Token Requests', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 12),
                   ...tokens.map((t) => _TokenQueueCard(token: t, onDone: _load)),
                 ],
               ]),
@@ -207,12 +323,15 @@ class _ReferralCard extends StatelessWidget {
         side: const BorderSide(color: AppColors.primary, width: 1.5)),
       child: Padding(padding: const EdgeInsets.all(14), child: Column(
         crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Referral #${referral['id']}', style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary)),
+          Text('Referral #${referral['id']}', style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary, fontSize: 16)),
+          const SizedBox(height: 8),
           Text('From: Dr. ${referral['fromDoctor']}  |  Patient: ${referral['patientName']}'),
+          const SizedBox(height: 4),
           Text('Dept: ${referral['requestedSpecialty']}  |  Urgency: ${referral['urgency']}',
             style: const TextStyle(color: AppColors.warning, fontWeight: FontWeight.w600)),
-          Text('"${referral['reason']}"', style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
+          Text('"${referral['reason']}"', style: const TextStyle(color: AppColors.textMuted, fontSize: 13, fontStyle: FontStyle.italic)),
+          const SizedBox(height: 12),
           Row(children: [
             Expanded(child: AppButton(label: 'Approve', onPressed: () async {
               await ApiService.processReferral(referral['id'], true, assignedDoctorId: doctors.isNotEmpty ? doctors[0]['id'] : null);
@@ -243,9 +362,10 @@ class _TokenQueueCard extends StatelessWidget {
       child: Padding(padding: const EdgeInsets.all(14), child: Column(
         crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('${token['type']} Request #${token['id']}',
-            style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.warning)),
+            style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.warning, fontSize: 16)),
+          const SizedBox(height: 8),
           Text('Patient: ${token['patientName']}'),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Row(children: [
             Expanded(child: AppButton(label: 'Approve', onPressed: () async {
               await ApiService.processToken(token['id'], true);
@@ -285,10 +405,28 @@ class _EmergencyTabState extends State<_EmergencyTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Emergency Alerts'),
+      appBar: AppBar(
+        title: const Text('🚨 Emergency Alerts'),
         backgroundColor: _alerts.isNotEmpty ? AppColors.danger : null,
         foregroundColor: _alerts.isNotEmpty ? Colors.white : null,
-        actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _load)]),
+        actions: [
+          if (_alerts.isNotEmpty)
+            TextButton(
+              onPressed: () async {
+                // Acknowledge all emergencies
+                for (final alert in _alerts) {
+                  await ApiService.acknowledgeEmergency(alert['id']);
+                }
+                _load();
+              },
+              child: const Text(
+                'Ack All',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              ),
+            ),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _alerts.isEmpty
@@ -310,10 +448,15 @@ class _EmergencyTabState extends State<_EmergencyTab> {
                       borderRadius: BorderRadius.circular(12),
                       side: BorderSide(color: color, width: 2)),
                     child: ListTile(
-                      leading: CircleAvatar(backgroundColor: color.withOpacity(0.15),
-                        child: Icon(Icons.emergency, color: color)),
-                      title: Text('${a['level']} — ${a['patientName']}',
-                        style: TextStyle(fontWeight: FontWeight.w700, color: color)),
+                      contentPadding: const EdgeInsets.all(12),
+                      leading: CircleAvatar(
+                        backgroundColor: color.withOpacity(0.15),
+                        child: Icon(Icons.emergency, color: color),
+                      ),
+                      title: Text(
+                        '${a['level']} — ${a['patientName']}',
+                        style: TextStyle(fontWeight: FontWeight.w700, color: color, fontSize: 16),
+                      ),
                       subtitle: Text(a['alertTime']?.toString().substring(0, 16) ?? ''),
                       trailing: ElevatedButton(
                         onPressed: () async {
@@ -339,28 +482,39 @@ class _MDProfileTab extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
       body: ListView(padding: const EdgeInsets.all(20), children: [
-        CircleAvatar(radius: 40, backgroundColor: AppColors.primaryLight,
-          child: Text(user.fullName[0].toUpperCase(),
-            style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w700, color: AppColors.primary))),
-        const SizedBox(height: 16),
-        Center(child: Text(user.fullName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700))),
-        Center(child: Text(user.email, style: const TextStyle(color: AppColors.textMuted))),
+        CircleAvatar(
+          radius: 50,
+          backgroundColor: AppColors.primaryLight,
+          child: Text(
+            user.fullName[0].toUpperCase(),
+            style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w700, color: AppColors.primary),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Center(child: Text(user.fullName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700))),
         const SizedBox(height: 8),
-        Center(child: Chip(label: const Text('MAIN DOCTOR'), backgroundColor: AppColors.primaryLight,
-          labelStyle: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600))),
-        const SizedBox(height: 32),
-        AppButton(label: 'Logout', danger: true, icon: Icons.logout,
+        Center(child: Text(user.email, style: const TextStyle(color: AppColors.textMuted, fontSize: 14))),
+        const SizedBox(height: 12),
+        Center(child: Chip(
+          label: const Text('MAIN DOCTOR'),
+          backgroundColor: AppColors.primaryLight,
+          labelStyle: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600),
+        )),
+        const SizedBox(height: 40),
+        AppButton(
+          label: 'Logout',
+          danger: true,
+          icon: Icons.logout,
           onPressed: () {
             context.read<AuthProvider>().logout();
-            Navigator.pushAndRemoveUntil(context,
-              MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);
-          }),
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+              (_) => false,
+            );
+          },
+        ),
       ]),
     );
   }
-}
-
-// ignore: avoid_classes_with_only_static_members
-class ApiConstants {
-  static const mdFinance = 'http://10.0.2.2:8081/api/md/finance';
 }

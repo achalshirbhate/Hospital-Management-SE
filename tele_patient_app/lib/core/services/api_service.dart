@@ -29,6 +29,42 @@ class ApiService {
     return _parse(res);
   }
 
+  static Future<String> forgotPassword(String email) async {
+    final res = await _client.post(
+      Uri.parse('${ApiConstants.forgotPassword}?email=${Uri.encodeComponent(email)}'),
+      headers: _headers(),
+    );
+    if (res.statusCode >= 400) throw Exception(_parse(res)['error']);
+    return res.body;
+  }
+
+  static Future<String> verifyOtp(String email, String otp) async {
+    final res = await _client.post(
+      Uri.parse('${ApiConstants.verifyOtp}?email=${Uri.encodeComponent(email)}&otp=$otp'),
+      headers: _headers(),
+    );
+    if (res.statusCode >= 400) throw Exception(_parse(res)['error']);
+    return res.body;
+  }
+
+  static Future<String> resetPasswordWithOtp(String email, String otp, String newPassword) async {
+    final res = await _client.post(
+      Uri.parse('${ApiConstants.resetPasswordOtp}?email=${Uri.encodeComponent(email)}&otp=$otp&newPassword=${Uri.encodeComponent(newPassword)}'),
+      headers: _headers(),
+    );
+    if (res.statusCode >= 400) throw Exception(_parse(res)['error']);
+    return res.body;
+  }
+
+  static Future<String> forceResetPassword(String email, String newPassword) async {
+    final res = await _client.post(
+      Uri.parse('${ApiConstants.forceResetPassword}?email=${Uri.encodeComponent(email)}&newPassword=${Uri.encodeComponent(newPassword)}'),
+      headers: _headers(),
+    );
+    if (res.statusCode >= 400) throw Exception(_parse(res)['error']);
+    return res.body;
+  }
+
   // ── PATIENT ──
   static Future<List<dynamic>> getPatientHistory(int id) async {
     final res = await _client.get(Uri.parse(ApiConstants.patientHistory(id)), headers: _headers());
@@ -151,10 +187,88 @@ class ApiService {
     await _client.post(Uri.parse(ApiConstants.uploadReport), headers: _headers(), body: jsonEncode(body));
   }
 
+  static Future<void> sendReportToChat(int reportId, int tokenId) async {
+    await _client.post(
+      Uri.parse('${ApiConstants.sendReportToChat}?reportId=$reportId&tokenId=$tokenId'),
+      headers: _headers(),
+    );
+  }
+
   // ── SOCIAL ──
   static Future<List<dynamic>> getSocialFeed() async {
     final res = await _client.get(Uri.parse(ApiConstants.socialFeed), headers: _headers());
     return jsonDecode(res.body) as List;
+  }
+
+  static Future<void> postSocial(String content) async {
+    await _client.post(
+      Uri.parse(ApiConstants.socialFeed),
+      headers: _headers(),
+      body: jsonEncode({'content': content}),
+    );
+  }
+
+  static Future<void> likeSocialPost(int postId) async {
+    await _client.post(
+      Uri.parse('${ApiConstants.baseUrl}/shared/social/$postId/like'),
+      headers: _headers(),
+    );
+  }
+
+  // ── LAUNCHPAD ──
+  static Future<void> submitLaunchpad(Map<String, dynamic> data) async {
+    await _client.post(
+      Uri.parse(ApiConstants.launchpad),
+      headers: _headers(),
+      body: jsonEncode(data),
+    );
+  }
+
+  static Future<List<dynamic>> getLaunchpadSubmissions() async {
+    final res = await _client.get(Uri.parse(ApiConstants.launchpad), headers: _headers());
+    return jsonDecode(res.body) as List;
+  }
+
+  // ── NOTIFICATIONS ──
+  static Future<List<dynamic>> getNotifications(int userId) async {
+    final res = await _client.get(
+      Uri.parse('${ApiConstants.baseUrl}/notifications/$userId'),
+      headers: _headers(),
+    );
+    return jsonDecode(res.body) as List;
+  }
+
+  static Future<void> markNotificationRead(int notificationId) async {
+    await _client.put(
+      Uri.parse('${ApiConstants.baseUrl}/notifications/$notificationId/read'),
+      headers: _headers(),
+    );
+  }
+
+  static Future<void> markAllNotificationsRead(int userId) async {
+    await _client.put(
+      Uri.parse('${ApiConstants.baseUrl}/notifications/$userId/read-all'),
+      headers: _headers(),
+    );
+  }
+
+  // ── FINANCE ──
+  static Future<void> addFinance(String type, double amount, String description) async {
+    await _client.post(
+      Uri.parse('${ApiConstants.baseUrl}/md/finance'),
+      headers: _headers(),
+      body: jsonEncode({'type': type, 'amount': amount, 'description': description}),
+    );
+  }
+
+  // ── ROLE MANAGEMENT ──
+  static Future<String> promoteUser(String email, String fullName, String role) async {
+    final res = await _client.post(
+      Uri.parse('${ApiConstants.mdPromote}?email=${Uri.encodeComponent(email)}&fullName=${Uri.encodeComponent(fullName)}&role=$role'),
+      headers: _headers(),
+    );
+    if (res.statusCode >= 400) throw Exception(_parse(res)['error']);
+    return res.body;
   }
 
   // ── HELPER ──

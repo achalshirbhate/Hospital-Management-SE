@@ -9,6 +9,7 @@ class AppColors {
   static const bg          = Color(0xFFF8FAFC);
   static const bgSecondary = Color(0xFFF1F5F9);
   static const textMain    = Color(0xFF0F172A);
+  static const textPrimary = Color(0xFF0F172A);
   static const textMuted   = Color(0xFF64748B);
   static const border      = Color(0xFFE2E8F0);
   static const cardBg      = Color(0xFFFFFFFF);

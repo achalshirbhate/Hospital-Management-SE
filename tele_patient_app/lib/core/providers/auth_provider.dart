@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/user_model.dart';
 import '../services/api_service.dart';
+import '../services/websocket_service.dart';
+import '../services/notification_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   UserModel? _user;
@@ -17,6 +19,14 @@ class AuthProvider extends ChangeNotifier {
     try {
       final data = await ApiService.login(email, password);
       _user = UserModel.fromJson(data);
+      
+      // Initialize WebSocket connection
+      await WebSocketService.instance.connect(_user!.userId, 'token-placeholder');
+      
+      // Initialize notification service
+      await NotificationService.instance.initialize();
+      await NotificationService.instance.requestPermissions();
+      
       _loading = false; notifyListeners();
       return true;
     } catch (e) {
@@ -40,6 +50,12 @@ class AuthProvider extends ChangeNotifier {
   }
 
   void logout() {
+    // Disconnect WebSocket
+    WebSocketService.instance.disconnect();
+    
+    // Cancel all notifications
+    NotificationService.instance.cancelAllNotifications();
+    
     _user = null;
     notifyListeners();
   }

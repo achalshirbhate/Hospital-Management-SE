@@ -2,13 +2,16 @@ class ApiConstants {
   // Change this to your deployed backend URL or local IP for testing
   // For local testing on Android emulator use: http://10.0.2.2:8081
   // For physical device use your machine's local IP: http://192.168.x.x:8081
-  static const baseUrl = 'http://10.0.2.2:8081/api';
+static const baseUrl = 'http://localhost:8081/api';
 
   // Auth
   static const login          = '$baseUrl/auth/login';
   static const register       = '$baseUrl/auth/register';
   static const forgotPassword = '$baseUrl/auth/forgot-password';
   static const resetPasswordOtp = '$baseUrl/auth/reset-password-otp';
+  static const verifyOtp      = '$baseUrl/auth/verify-otp';
+  static const resetPassword  = '$baseUrl/auth/reset-password';
+  static const forceResetPassword = '$baseUrl/auth/force-reset-password';
 
   // Patient
   static String patientHistory(int id)  => '$baseUrl/patient/$id/history';

@@ -5,6 +5,8 @@ import '../../core/providers/auth_provider.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_text_field.dart';
 import 'register_screen.dart';
+import 'forgot_password_screen.dart';
+import 'force_reset_password_screen.dart';
 import '../patient/patient_home.dart';
 import '../doctor/doctor_home.dart';
 import '../md/md_home.dart';
@@ -25,8 +27,22 @@ class _LoginScreenState extends State<LoginScreen> {
     final auth = context.read<AuthProvider>();
     final ok = await auth.login(_email.text.trim(), _password.text.trim());
     if (!mounted) return;
+    
     if (ok) {
       final user = auth.user!;
+      
+      // Check if force password reset is needed
+      if (user.forcePasswordReset == true) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ForceResetPasswordScreen(email: user.email),
+          ),
+        );
+        return;
+      }
+      
+      // Navigate to appropriate home screen
       Widget dest;
       if (user.isMainDoctor)     dest = const MDHome();
       else if (user.isDoctor)    dest = const DoctorHome();
@@ -89,7 +105,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
-                            onPressed: () {},
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const ForgotPasswordScreen(),
+                                ),
+                              );
+                            },
                             child: const Text('Forgot Password?', style: TextStyle(fontSize: 13)),
                           ),
                         ),

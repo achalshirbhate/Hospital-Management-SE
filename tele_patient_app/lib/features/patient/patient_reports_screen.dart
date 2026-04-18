@@ -3,6 +3,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/models/report_model.dart';
 import '../../core/services/api_service.dart';
 import '../../core/widgets/app_button.dart';
+import '../shared/upload_report_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class PatientReportsScreen extends StatefulWidget {
@@ -33,22 +34,62 @@ class _PatientReportsScreenState extends State<PatientReportsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('My Reports'),
-        actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _load)]),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.upload_file),
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => UploadReportScreen(patientId: widget.patientId),
+                ),
+              );
+              if (result == true) _load();
+            },
+            tooltip: 'Upload Report',
+          ),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
+        ]),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _reports.isEmpty
-            ? const Center(child: Text('No reports found', style: TextStyle(color: AppColors.textMuted)))
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.folder_open, size: 64, color: AppColors.textMuted),
+                    const SizedBox(height: 16),
+                    const Text('No reports found', style: TextStyle(color: AppColors.textMuted)),
+                    const SizedBox(height: 24),
+                    AppButton(
+                      label: 'Upload First Report',
+                      icon: Icons.upload_file,
+                      onPressed: () async {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => UploadReportScreen(patientId: widget.patientId),
+                          ),
+                        );
+                        if (result == true) _load();
+                      },
+                      width: 200,
+                    ),
+                  ],
+                ),
+              )
             : ListView.builder(
                 padding: const EdgeInsets.all(16),
                 itemCount: _reports.length,
-                itemBuilder: (_, i) => _ReportCard(report: _reports[i])),
+                itemBuilder: (_, i) => _ReportCard(report: _reports[i], onRefresh: _load)),
     );
   }
 }
 
 class _ReportCard extends StatelessWidget {
   final ReportModel report;
-  const _ReportCard({required this.report});
+  final VoidCallback onRefresh;
+  const _ReportCard({required this.report, required this.onRefresh});
 
   IconData get _icon => report.reportType == 'PDF'
       ? Icons.picture_as_pdf
@@ -96,19 +137,35 @@ class _ReportCard extends StatelessWidget {
             )),
             const SizedBox(width: 10),
             Expanded(child: AppButton(
-              label: 'Download',
-              icon: Icons.download,
+              label: 'Send to Chat',
+              icon: Icons.send,
               outline: true,
-              onPressed: () async {
-                final uri = Uri.tryParse(report.fileUrl);
-                if (uri != null && await canLaunchUrl(uri)) {
-                  launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-              },
+              onPressed: () => _showSendToChatDialog(context),
             )),
           ]),
         ],
       )),
+    );
+  }
+
+  void _showSendToChatDialog(BuildContext context) {
+    // TODO: Get active chat sessions for this patient
+    // For now, show a simple dialog
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Send to Chat'),
+        content: const Text(
+          'This feature will send the report to an active chat session.\n\n'
+          'Note: You need an active consultation session to send reports.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
     );
   }
 }

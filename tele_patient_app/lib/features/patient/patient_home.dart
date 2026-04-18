@@ -6,9 +6,15 @@ import '../../core/services/api_service.dart';
 import '../../core/models/history_model.dart';
 import '../../core/models/token_model.dart';
 import '../../core/widgets/app_button.dart';
+import '../../core/widgets/notification_bell.dart';
+import '../../core/services/pdf_service.dart';
 import '../auth/login_screen.dart';
 import 'patient_reports_screen.dart';
 import 'emergency_screen.dart';
+import '../shared/video_call_screen.dart';
+import '../shared/chat_screen.dart';
+import '../shared/launchpad_screen.dart';
+import '../shared/social_feed_screen.dart';
 
 class PatientHome extends StatefulWidget {
   const PatientHome({super.key});
@@ -85,7 +91,26 @@ class _AppointmentsTabState extends State<_AppointmentsTab> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('My Appointments'),
-        actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _load)]),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.rocket_launch),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const LaunchpadScreen()),
+            ),
+            tooltip: 'LaunchPad',
+          ),
+          IconButton(
+            icon: const Icon(Icons.forum),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SocialFeedScreen()),
+            ),
+            tooltip: 'Social Feed',
+          ),
+          const NotificationBell(),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
+        ]),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -132,7 +157,32 @@ class _TokenCard extends StatelessWidget {
         ]),
         trailing: isApproved
             ? ElevatedButton(
-                onPressed: () {},
+                onPressed: () {
+                  final user = context.read<AuthProvider>().user!;
+                  if (token.type == 'VIDEO') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => VideoCallScreen(
+                          tokenId: token.id,
+                          userId: user.userId,
+                          userName: user.fullName,
+                          scheduledTime: token.scheduledTime?.toLocal().toString().substring(0, 16),
+                        ),
+                      ),
+                    );
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ChatScreen(
+                          tokenId: token.id,
+                          scheduledTime: token.scheduledTime?.toLocal().toString().substring(0, 16),
+                        ),
+                      ),
+                    );
+                  }
+                },
                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
                 child: Text(token.type == 'VIDEO' ? 'Join' : 'Chat',
                   style: const TextStyle(color: Colors.white, fontSize: 12)))
@@ -179,6 +229,25 @@ class _HistoryTabState extends State<_HistoryTab> {
     final user = context.read<AuthProvider>().user!;
     return Scaffold(
       appBar: AppBar(title: const Text('Medical History'), actions: [
+        IconButton(
+          icon: const Icon(Icons.picture_as_pdf),
+          onPressed: () async {
+            if (_filtered.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('No history to export')),
+              );
+              return;
+            }
+            try {
+              await PdfService.exportHistoryToPdf(_filtered, user.fullName, user.email);
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Error: ${e.toString()}')),
+              );
+            }
+          },
+          tooltip: 'Export PDF',
+        ),
         IconButton(icon: const Icon(Icons.folder_open),
           onPressed: () => Navigator.push(context,
             MaterialPageRoute(builder: (_) => PatientReportsScreen(patientId: user.userId)))),
