@@ -10,10 +10,13 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class AuthResponse {
-    private String message;
-    private Long userId;
-    private String fullName;
-    private String email;
-    private String role;
+    private String  message;
+    private Long    userId;
+    private String  fullName;
+    private String  email;
+    private String  role;
     private boolean requirePasswordReset;
+
+    /** JWT Bearer token — present only on successful login. */
+    private String  token;
 }
