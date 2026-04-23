@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: telepatient-api
+    runtime: docker
+    rootDir: auth-service
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /actuator/health
+    # Render free tier: service sleeps after 15 min of inactivity
+    # Upgrade to Starter ($7/mo) to keep it always-on
+    plan: free
+    envVars:
+      # These are placeholders — set real values in the Render dashboard
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: DB_URL
+        sync: false   # set manually in dashboard
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_POOL_SIZE
+        value: "3"
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        sync: false   # generate with: openssl rand -base64 64
+      - key: JWT_EXPIRATION
+        value: "86400000"
+      - key: CORS_ALLOWED_ORIGINS
+        value: "*"    # change to your frontend URL if you have a web app
+      - key: DDL_AUTO
+        value: update

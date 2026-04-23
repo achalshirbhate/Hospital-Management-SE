@@ -18,11 +18,12 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
-    private final UserRepository userRepository;
+    private final UserRepository  userRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final JwtUtil jwtUtil;
 
+    // ─── Register ─────────────────────────────────────────────────────────────
     @Override
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
@@ -46,13 +47,16 @@ public class AuthServiceImpl implements AuthService {
                 .build();
     }
 
+    // ─── Login ────────────────────────────────────────────────────────────────
     @Override
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid email or password"));
+
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new IllegalArgumentException("Invalid email or password");
         }
+
         boolean requireReset = request.getPassword().equals("temp@123");
         String token = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().name());
         return AuthResponse.builder()
@@ -63,9 +67,11 @@ public class AuthServiceImpl implements AuthService {
                 .role(user.getRole().name())
                 .token(token)
                 .requirePasswordReset(requireReset)
+                .token(token)                         // ← JWT returned here
                 .build();
     }
 
+    // ─── Forgot password ──────────────────────────────────────────────────────
     @Override
     public void generateResetOtp(String email) {
         User user = userRepository.findByEmail(email)
@@ -81,6 +87,7 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
+    // ─── Reset via OTP ────────────────────────────────────────────────────────
     @Override
     public void resetPasswordWithOtp(String email, String otp, String newPassword) {
         User user = userRepository.findByEmail(email)
@@ -95,6 +102,7 @@ public class AuthServiceImpl implements AuthService {
         userRepository.save(user);
     }
 
+    // ─── Reset temp password ──────────────────────────────────────────────────
     @Override
     public void resetPasswordWithTemp(String email, String currentPassword, String newPassword) {
         User user = userRepository.findByEmail(email)

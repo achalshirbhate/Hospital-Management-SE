@@ -14,4 +14,7 @@ public class AuthResponse {
     private String role;
     private String token;           // JWT token
     private boolean requirePasswordReset;
+
+    /** JWT Bearer token — present only on successful login. */
+    private String  token;
 }

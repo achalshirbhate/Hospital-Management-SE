@@ -1,0 +1,21 @@
+# Maven
+target/
+*.class
+*.jar
+*.war
+
+# Local dev profile (contains real credentials)
+src/main/resources/application-local.properties
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.*
