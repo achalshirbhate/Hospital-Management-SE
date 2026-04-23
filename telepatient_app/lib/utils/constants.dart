@@ -1,25 +1,13 @@
 // ─── App-wide constants ───────────────────────────────────────────────────────
-import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AppConstants {
   // Automatically picks the right URL based on platform
-  static String get baseUrl {
-    if (kIsWeb) {
-      return 'http://localhost:8081'; // Running in browser (Chrome)
-    }
-    // TODO: Replace with your deployed backend URL
-    // Example: return 'https://your-app.onrender.com';
-    // For now, using local network (only works on same WiFi)
-    return 'http://192.168.0.232:8081'; // Android physical device
-    // return 'http://10.0.2.2:8081'; // Android emulator
-  }
+  // ✅ Production URL — works on phone, web, anywhere
+  static const String _renderUrl = 'https://telepatient-api.onrender.com';
 
-  static String get wsVideoUrl {
-    if (kIsWeb) {
-      return 'ws://localhost:8081/ws/video';
-    }
-    return 'ws://192.168.0.232:8081/ws/video';
-  }
+  static String get baseUrl => _renderUrl;
+
+  static String get wsVideoUrl => 'wss://telepatient-api.onrender.com/ws/video';
 
   // Temp password that forces a reset
   static const String tempPassword = 'temp@123';
