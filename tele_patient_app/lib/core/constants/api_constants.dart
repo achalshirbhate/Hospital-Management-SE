@@ -2,7 +2,7 @@ class ApiConstants {
   // Change this to your deployed backend URL or local IP for testing
   // For local testing on Android emulator use: http://10.0.2.2:8081
   // For physical device use your machine's local IP: http://192.168.x.x:8081
-static const baseUrl = 'http://localhost:8081/api';
+static const baseUrl = 'http://192.168.0.232:8081/api';
 
   // Auth
   static const login          = '$baseUrl/auth/login';

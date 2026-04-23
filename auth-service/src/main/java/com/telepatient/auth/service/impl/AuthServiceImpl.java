@@ -5,11 +5,13 @@ import com.telepatient.auth.dto.request.RegisterRequest;
 import com.telepatient.auth.dto.response.AuthResponse;
 import com.telepatient.auth.entity.User;
 import com.telepatient.auth.repository.UserRepository;
+import com.telepatient.auth.security.JwtUtil;
 import com.telepatient.auth.service.AuthService;
 import com.telepatient.auth.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
 import java.time.LocalDateTime;
 
 @Service
@@ -19,11 +21,12 @@ public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
+    private final JwtUtil jwtUtil;
 
     @Override
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalArgumentException("Email already exists");
+            throw new IllegalArgumentException("Email already registered");
         }
         User user = User.builder()
                 .fullName(request.getFullName())
@@ -31,13 +34,15 @@ public class AuthServiceImpl implements AuthService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(com.telepatient.auth.entity.Role.PATIENT)
                 .build();
-        User savedUser = userRepository.save(user);
+        User saved = userRepository.save(user);
+        String token = jwtUtil.generateToken(saved.getId(), saved.getEmail(), saved.getRole().name());
         return AuthResponse.builder()
-                .message("User registered successfully")
-                .userId(savedUser.getId())
-                .fullName(savedUser.getFullName())
-                .email(savedUser.getEmail())
-                .role(savedUser.getRole().name())
+                .message("Registered successfully")
+                .userId(saved.getId())
+                .fullName(saved.getFullName())
+                .email(saved.getEmail())
+                .role(saved.getRole().name())
+                .token(token)
                 .build();
     }
 
@@ -49,12 +54,14 @@ public class AuthServiceImpl implements AuthService {
             throw new IllegalArgumentException("Invalid email or password");
         }
         boolean requireReset = request.getPassword().equals("temp@123");
+        String token = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().name());
         return AuthResponse.builder()
                 .message("Login successful")
                 .userId(user.getId())
                 .fullName(user.getFullName())
                 .email(user.getEmail())
                 .role(user.getRole().name())
+                .token(token)
                 .requirePasswordReset(requireReset)
                 .build();
     }
@@ -62,32 +69,26 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void generateResetOtp(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("No account found with this email address."));
+                .orElseThrow(() -> new IllegalArgumentException("No account found with this email"));
         String otp = String.format("%06d", new java.util.Random().nextInt(999999));
         user.setResetOtp(otp);
-        user.setOtpExpiry(LocalDateTime.now().plusMinutes(5));
+        user.setOtpExpiry(LocalDateTime.now().plusMinutes(10));
         userRepository.save(user);
-        // Try sending email; silently fallback to console if SMTP not configured
         try {
             emailService.sendOtpEmail(email, otp);
         } catch (Exception e) {
-            System.out.println("\n=========================================================");
-            System.out.println("OTP FOR: " + email + "  →  " + otp);
-            System.out.println("=========================================================\n");
+            System.out.printf("%n=== OTP for %s: %s ===%n", email, otp);
         }
-        // Always return success — OTP is saved regardless of email delivery
     }
 
     @Override
     public void resetPasswordWithOtp(String email, String otp, String newPassword) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("Email not found"));
-        if (otp == null || !otp.equals(user.getResetOtp())) {
-            throw new IllegalArgumentException("Invalid or expired OTP");
-        }
-        if (user.getOtpExpiry() == null || LocalDateTime.now().isAfter(user.getOtpExpiry())) {
-            throw new IllegalArgumentException("OTP has expired. Please request a new one.");
-        }
+        if (otp == null || !otp.equals(user.getResetOtp()))
+            throw new IllegalArgumentException("Invalid OTP");
+        if (user.getOtpExpiry() == null || LocalDateTime.now().isAfter(user.getOtpExpiry()))
+            throw new IllegalArgumentException("OTP expired. Request a new one.");
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setResetOtp(null);
         user.setOtpExpiry(null);
@@ -98,12 +99,10 @@ public class AuthServiceImpl implements AuthService {
     public void resetPasswordWithTemp(String email, String currentPassword, String newPassword) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("Email not found"));
-        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+        if (!passwordEncoder.matches(currentPassword, user.getPassword()))
             throw new IllegalArgumentException("Invalid current password");
-        }
-        if (!currentPassword.equals("temp@123")) {
-            throw new IllegalArgumentException("This mechanism is strictly restricted to temporary passwords only.");
-        }
+        if (!currentPassword.equals("temp@123"))
+            throw new IllegalArgumentException("Only temporary passwords can be reset this way");
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
     }

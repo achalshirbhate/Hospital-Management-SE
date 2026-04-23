@@ -26,7 +26,7 @@ class WebSocketService {
       await disconnect();
 
       // WebSocket URL - adjust based on your backend
-      final wsUrl = 'ws://localhost:8081/ws?userId=$userId&token=$token';
+final wsUrl = 'ws://192.168.0.232:8081/ws?userId=$userId&token=$token';
       
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
       _isConnected = true;

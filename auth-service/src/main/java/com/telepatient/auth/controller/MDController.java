@@ -119,8 +119,11 @@ public class MDController {
     }
 
     @PutMapping("/launchpad/{id}/respond")
-    public ResponseEntity<String> respondToSubmission(@PathVariable Long id, @RequestParam String response) {
-        mdService.respondToLaunchpadSubmission(id, response);
+    public ResponseEntity<String> respondToSubmission(@PathVariable Long id,
+            @RequestBody(required = false) java.util.Map<String, String> body,
+            @RequestParam(required = false) String response) {
+        String resp = (body != null && body.containsKey("response")) ? body.get("response") : response;
+        mdService.respondToLaunchpadSubmission(id, resp);
         return ResponseEntity.ok("Response sent to submitter");
     }
 

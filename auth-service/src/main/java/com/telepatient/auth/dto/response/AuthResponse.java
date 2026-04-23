@@ -1,9 +1,6 @@
 package com.telepatient.auth.dto.response;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Data
 @Builder
@@ -15,5 +12,6 @@ public class AuthResponse {
     private String fullName;
     private String email;
     private String role;
+    private String token;           // JWT token
     private boolean requirePasswordReset;
 }
