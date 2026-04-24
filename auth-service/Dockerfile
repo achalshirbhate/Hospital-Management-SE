@@ -1,15 +1,16 @@
 # ── Build stage ──────────────────────────────────────────────────────────────
+# Java 21 required — project uses Java 21 features
 FROM maven:3.9-eclipse-temurin-21 AS build
 
 WORKDIR /app
 
-# Download dependencies first (cached layer)
+# Copy pom.xml and download dependencies (cached layer)
 COPY pom.xml .
 RUN mvn dependency:go-offline -B
 
-# Build
+# Copy source and build
 COPY src ./src
-RUN mvn clean package -DskipTests
+RUN mvn clean package -DskipTests -Dmaven.compiler.source=21 -Dmaven.compiler.target=21
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
 FROM eclipse-temurin:21-jre-alpine
