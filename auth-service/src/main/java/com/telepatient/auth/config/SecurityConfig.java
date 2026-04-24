@@ -63,11 +63,11 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        List<String> origins = Arrays.asList(allowedOrigins.split(","));
-        config.setAllowedOriginPatterns(origins);
+        // Allow ALL origins — needed for mobile app and local development
+        config.addAllowedOriginPattern("*");
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true);
+        config.setAllowCredentials(false); // must be false when origin is *
         config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
