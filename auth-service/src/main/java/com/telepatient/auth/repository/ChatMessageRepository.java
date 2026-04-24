@@ -8,5 +8,5 @@ import java.util.List;
 
 @Repository
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
-    List<ChatMessage> findByTokenPatientOrderBySentAtAsc(com.telepatient.auth.entity.User patient);
+    List<ChatMessage> findByTokenOrderBySentAtAsc(CommunicationToken token);
 }
